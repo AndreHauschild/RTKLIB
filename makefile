@@ -62,7 +62,7 @@ endif
 # Targets
 
 all: init \
-	 iers_ apps_ simobs_
+	 iers_ apps_
 
 utils: gencrc_ logfile_ rnx2rtcm_ simobs_ # geniono_ testeph_
 
@@ -104,7 +104,8 @@ testeph_:
 # Clean up
 
 clean:
-	cd $(RTKLIB_bld); $(PMAKE) clean
+	cd $(RTKLIB_bld); if [ -e makefile ]; then $(PMAKE) clean; fi
+	rm -rf $(RTKLIB_bld)/*
 	cd $(IERS);     make clean
 	cd $(UTEST);    make clean
 	cd $(GENCRC);   make clean
