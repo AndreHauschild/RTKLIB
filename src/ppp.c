@@ -4,6 +4,7 @@
 *          Copyright (C) 2010-2020 by T.TAKASU, All rights reserved.
 *
 * options : -DIERS_MODEL  use IERS tide model
+*           -DTROP_HOPF   use Hopfield tropospheric model
 *           -DOUTSTAT_AMB output ambiguity parameters to solution status
 *
 * references :
@@ -866,6 +867,35 @@ static void satantpcv(const double *rs, const double *rr, const pcv_t *pcv,
     antmodel_s(pcv,nadir,dant);
 }
 /* precise tropospheric model ------------------------------------------------*/
+#ifdef TROP_HOPF
+static double trop_model_prec(gtime_t time, const double *pos,
+                              const double *azel, const double *x, double *dtdx,
+                              double *var)
+{
+    const double zazel[]={0.0,PI/2.0};
+    double zhd,zwd,m_h,m_w,cotz,grad_n,grad_e;
+
+    /* zenith hydrostatic delay */
+    zhd=tropmodelHpf(time,pos,zazel,0.0,&zwd);
+
+    /* mapping function */
+    m_h=tropmapfHpf(time,pos,azel,&m_w);
+
+    if (azel[1]>0.0) {
+
+        /* m_w=m_0+m_0*cot(el)*(Gn*cos(az)+Ge*sin(az)): ref [6] */
+        cotz=1.0/tan(azel[1]);
+        grad_n=m_w*cotz*cos(azel[0]);
+        grad_e=m_w*cotz*sin(azel[0]);
+        m_w+=grad_n*x[1]+grad_e*x[2];
+        dtdx[1]=grad_n*(x[0]-zhd);
+        dtdx[2]=grad_e*(x[0]-zhd);
+    }
+    dtdx[0]=m_w;
+    *var=SQR(0.01);
+    return m_h*zhd+m_w*zwd+m_w*(x[0]-zhd-zwd);
+}
+#else
 static double trop_model_prec(gtime_t time, const double *pos,
                               const double *azel, const double *x, double *dtdx,
                               double *var)
@@ -893,6 +923,7 @@ static double trop_model_prec(gtime_t time, const double *pos,
     *var=SQR(0.01);
     return m_h*zhd+m_w*(x[0]-zhd);
 }
+#endif
 /* tropospheric model ---------------------------------------------------------*/
 static int model_trop(gtime_t time, const double *pos, const double *azel,
                       const prcopt_t *opt, const double *x, double *dtdx,
