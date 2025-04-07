@@ -1566,6 +1566,12 @@ EXPORT double tropmodel(gtime_t time, const double *pos, const double *azel,
                         double humi);
 EXPORT double tropmapf(gtime_t time, const double *pos, const double *azel,
                        double *mapfw);
+#ifdef TROP_HOPF
+EXPORT double tropmodelHpf(gtime_t time, const double *pos, const double *azel,
+                           double *zwd);
+EXPORT double tropmapfHpf(gtime_t time, const double *pos, const double *azel,
+                           double *mapfw);
+#endif
 EXPORT int iontec(gtime_t time, const nav_t *nav, const double *pos,
                   const double *azel, int opt, double *delay, double *var);
 EXPORT void readtec(const char *file, nav_t *nav, int opt);

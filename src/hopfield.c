@@ -15,11 +15,11 @@
 * args   : gtime_t time     I   time
 *          double *pos      I   receiver position {lat,lon,h} (rad,m)
 *          double *azel     I   azimuth/elevation angle {az,el} (rad)
-*          double humi      I   relative humidity
+*          double *zwd      O   zenith wet delay (m)
 * return : tropospheric delay (m)
 *-----------------------------------------------------------------------------*/
 extern double tropmodelHpf(gtime_t time, const double *pos, const double *azel,
-                           double humi, double *zwd)
+                           double *zwd)
 {
     double hgt,pres,temp,e,z,trph,trpw;
 
