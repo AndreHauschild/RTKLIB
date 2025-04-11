@@ -36,7 +36,8 @@ build/
 # Ignore compilation results
 
 bin/*
-lib/libRTKLib.so*
+build
+lib/librtklib.so
 app/consapp/convbin/gcc/convbin
 app/consapp/pos2kml/gcc/pos2kml
 app/consapp/rnx2rtkp/gcc/rnx2rtkp
@@ -49,6 +50,7 @@ util/gencrc/genxor
 util/rnx2rtcm/rnx2rtcm
 util/simobs/gcc/simobs
 
+test/data/geoiddata/
 test/utest/*.out
 test/utest/t_atmos
 test/utest/t_coord
