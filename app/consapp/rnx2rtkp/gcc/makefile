@@ -2,7 +2,7 @@
 BINDIR  = /usr/local/bin
 SRC     = ../../../../src
 
-OPTS    = -DTRACE -DENAGLO -DENAQZS -DENAGAL -DENACMP -DENAIRN -DNFREQ=3 -DNEXOBS=3
+OPTS    = -DTRACE -DENAGLO -DENAQZS -DENAGAL -DENACMP -DENAIRN -DNFREQ=4 -DNEXOBS=3
 #OPTS    = -DTRACE -DENAGLO -DENAQZS -DENAGAL -DENACMP -DENAIRN -DNFREQ=5 -DIERS_MODEL
 #OPTS    = -DENAGLO -DENAQZS -DENAGAL -DENACMP -DNFREQ=2
 
@@ -99,9 +99,9 @@ rtcm3e.o   : $(SRC)/rtklib.h
 ionex.o    : $(SRC)/rtklib.h
 tides.o    : $(SRC)/rtklib.h
 
-CMD1    = ./rnx2rtkp
-INPUT11 = ../../../test/data/rinex/07590920.05o ../../../test/data/rinex/30400920.05n
-INPUT12 = ../../../test/data/rinex/30400920.05o
+CMD1    = rnx2rtkp
+INPUT11 = ../../../../test/data/rinex/07590920.05o ../../../../test/data/rinex/30400920.05n
+INPUT12 = ../../../../test/data/rinex/30400920.05o
 OPTS1   = -r -3978241.958 3382840.234 3649900.853
 
 test : test1 test2 test3 test4 test5 test6 test7 test8 test9 test10

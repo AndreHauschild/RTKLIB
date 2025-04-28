@@ -37,6 +37,7 @@ build/
 
 bin/*
 build
+lib/libRTKLib.so*
 lib/librtklib.so
 app/consapp/convbin/gcc/convbin
 app/consapp/pos2kml/gcc/pos2kml
@@ -47,6 +48,7 @@ app/consapp/str2str/gcc/str2str
 util/gencrc/gencrc
 util/gencrc/genmsk
 util/gencrc/genxor
+util/logfile/margelog
 util/rnx2rtcm/rnx2rtcm
 util/simobs/gcc/simobs
 
