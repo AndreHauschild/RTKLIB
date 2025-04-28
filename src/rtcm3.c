@@ -1422,6 +1422,7 @@ static int decode_type1042(rtcm_t *rtcm)
     eph.toc=bdt2gpst(bdt2time(eph.week,toc));      /* bdt -> gpst */
     eph.ttr=rtcm->time;
     eph.A=sqrtA*sqrtA;
+    eph.flag=((1<=prn&&prn<=5)||(59<=prn&&prn<=63)?2:1); // GEO or MEO/IGSO satellite
     if (!strstr(rtcm->opt,"-EPHALL")) {
         if (timediff(eph.toe,rtcm->nav.eph[sat-1].toe)==0.0&&
             eph.iode==rtcm->nav.eph[sat-1].iode&&

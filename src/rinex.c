@@ -864,7 +864,7 @@ static int decode_obsdata(FILE *fp, char *buff, double ver, int mask,
                 p[l[0]]=1; p[l[1]]=-1;
             }
             else if (val[l[0]]==0.0&&val[l[1]]!=0.0) {
-                p[l[0]]=-1; p[l[1]]=1; 
+                p[l[0]]=-1; p[l[1]]=1;
             }
             else if (ind->pri[l[1]]>ind->pri[l[0]]) {
                 p[l[1]]=1; p[l[0]]=NEXOBS<2?-1:NFREQ+1;
@@ -891,7 +891,7 @@ static int decode_obsdata(FILE *fp, char *buff, double ver, int mask,
             }
         }
     }
-    
+
     /* save observation data */
     for (i=0;i<ind->n;i++) {
         if (p[i]<0||(val[i]==0.0&&lli[i]==0)) continue;
@@ -1052,7 +1052,7 @@ static int readrnxobsb(FILE *fp, const char *opt, double ver, int *tsys,
     sigind_t index[RNX_NUMSYS]={{0}};
     char buff[MAXRNXLEN];
     int i=0,n=0,nsat=0,sats[MAXOBS]={0},mask;
-    
+
     /* set system mask */
     mask=set_sysmask(opt);
 
@@ -1078,7 +1078,7 @@ static int readrnxobsb(FILE *fp, const char *opt, double ver, int *tsys,
 #if RNX_NUMSYS>=7
     set_index(ver,SYS_IRN,opt,tobs[RNX_SYS_IRN],index+6);
 #endif
-    
+
     /* read record */
     while (fgets(buff,MAXRNXLEN,fp)) {
 
@@ -1391,6 +1391,10 @@ static int readrnxnavb(FILE *fp, const char *opt, double ver, int sys,
 
     while (fgets(buff,MAXRNXLEN,fp)) {
 
+        if (ver>=400) {
+          // TODO: read first 5 chars (e.g. "> EPH") and skip all but EPH redords
+        }
+
         if (i==0) {
 
             /* decode satellite field */
@@ -1594,7 +1598,7 @@ static int readrnxfp(FILE *fp, gtime_t ts, gtime_t te, double tint,
     double ver;
     int sys,tsys=TSYS_GPS;
     char tobs[RNX_NUMSYS][MAXOBSTYPE][4]={{""}};
-    
+
     trace(3,"readrnxfp: flag=%d index=%d\n",flag,index);
 
     /* read RINEX file header */
@@ -2031,14 +2035,14 @@ static void outobstype_ver2(FILE *fp, const rnxopt_t *opt)
     int i;
 
     trace(3,"outobstype_ver2:\n");
-    
+
     fprintf(fp,"%6d",opt->nobs[RNX_SYS_GPS]);
-    
+
     for (i=0;i<opt->nobs[RNX_SYS_GPS];i++) {
         if (i>0&&i%9==0) fprintf(fp,"      ");
 
         fprintf(fp,"%6s",opt->tobs[RNX_SYS_GPS][i]);
-        
+
         if (i%9==8) fprintf(fp,"%-20s\n",label);
     }
     if (opt->nobs[RNX_SYS_GPS]==0||i%9>0) {
@@ -2053,7 +2057,7 @@ static void outobstype_ver3(FILE *fp, const rnxopt_t *opt)
     int i,j;
 
     trace(3,"outobstype_ver3:\n");
-    
+
     for (i=0;i<RNX_NUMSYS;i++) {
         if (!(navsys[i]&opt->navsys)||!opt->nobs[i]) continue;
 
@@ -2092,7 +2096,7 @@ static void outrnx_phase_shift(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
     const char *label="SYS / PHASE SHIFT";
     char obs[8];
     int i,j,k;
-    
+
     for (i=0;i<RNX_NUMSYS;i++) {
         if (!(navsys[i]&opt->navsys)||!opt->nobs[i]) continue;
         for (j=0;j<opt->nobs[i];j++) {
@@ -2318,7 +2322,7 @@ static int obsindex(int rnxver, int sys, const uint8_t *code, const char *tobs,
 
         /* signal mask */
         if (mask[c-1]=='0') continue;
-        
+
         if (rnxver<=299) { /* ver.2 */
             if (!strcmp(tobs,"C1")&&(sys==SYS_GPS||sys==SYS_GLO||sys==SYS_QZS||
                 sys==SYS_SBS||sys==SYS_CMP)) {
@@ -2685,8 +2689,10 @@ extern int outrnxnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
         if (!*opt->comment[i]) continue;
         fprintf(fp,"%-60.60s%-20s\n",opt->comment[i],"COMMENT");
     }
-    out_iono(fp,opt->sep_nav?SYS_GPS:SYS_ALL,opt,nav);
-    out_time(fp,opt->sep_nav?SYS_GPS:SYS_ALL,opt,nav);
+    if (opt->rnxver<400) {
+      out_iono(fp,opt->sep_nav?SYS_GPS:SYS_ALL,opt,nav);
+      out_time(fp,opt->sep_nav?SYS_GPS:SYS_ALL,opt,nav);
+    }
     out_leaps(fp,SYS_GPS,opt,nav);
 
     return fprintf(fp,"%60s%-20s\n","","END OF HEADER")!=EOF;
@@ -2714,6 +2720,22 @@ extern int outrnxnavb(FILE *fp, const rnxopt_t *opt, const eph_t *eph)
     else {
         time2epoch(gpst2bdt(eph->toc),ep); /* gpst -> bdt */
     }
+
+    if (opt->rnxver>=400) {
+      if (!sat2code(eph->sat,code)) return 0;
+      fprintf(fp,"> EPH %-3s ",code);
+      char type[4];
+      switch(sys) {
+        case(SYS_GAL):
+            fprintf(fp,"%-4s ",eph->code==258?"FNAV":"INAV"); break;
+        case(SYS_CMP):
+            fprintf(fp,"%-4s ",eph->flag==2?"D2  ":"D1  "); break;
+        default:
+            fprintf(fp,"LNAV ");
+      }
+      fprintf(fp,"     \n");
+    }
+
     if ((opt->rnxver>=300&&sys==SYS_GPS)||(opt->rnxver>=212&&sys==SYS_GAL)||
         (opt->rnxver>=302&&sys==SYS_QZS)||(opt->rnxver>=302&&sys==SYS_CMP)||
         (opt->rnxver>=303&&sys==SYS_IRN)) {
@@ -2871,6 +2893,10 @@ extern int outrnxgnavb(FILE *fp, const rnxopt_t *opt, const geph_t *geph)
     toe=gpst2utc(geph->toe); /* gpst -> utc */
     time2epoch(toe,ep);
 
+    if (opt->rnxver>=400) {
+      if (!sat2code(geph->sat,code)) return 0;
+      fprintf(fp,"> EPH %-3s LNAV     \n",code);
+    }
     if (opt->rnxver<=299) { /* ver.2 */
         fprintf(fp,"%2d %02d %02.0f %02.0f %02.0f %02.0f %04.1f",prn,
                 (int)ep[0]%100,ep[1],ep[2],ep[3],ep[4],ep[5]);
@@ -2964,6 +2990,10 @@ extern int outrnxhnavb(FILE *fp, const rnxopt_t *opt, const seph_t *seph)
 
     time2epoch(seph->t0,ep);
 
+    if (opt->rnxver>=400) {
+      if (!sat2code(seph->sat,code)) return 0;
+      fprintf(fp,"> EPH %-3s SBAS     \n",code);
+    }
     if (opt->rnxver<=299) { /* ver.2 */
         fprintf(fp,"%2d %02d %02.0f %02.0f %02.0f %02.0f %04.1f",prn-100,
                 (int)ep[0]%100,ep[1],ep[2],ep[3],ep[4],ep[5]);
