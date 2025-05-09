@@ -36,7 +36,6 @@ __published:
 	TComboBox *TropOpt;
 	TComboBox *PosMode;
 	TComboBox *Freq;
-	TComboBox *Solution;
 	TComboBox *SatEphem;
 	TEdit *ExSatsE;
 	TTabSheet *TabSheet2;
@@ -242,6 +241,7 @@ __published:
     TEdit *ValidThresARMax;
 	TEdit *DopThres;
 	TEdit *MeasErrR5;
+	TEdit *MeasErrR6;
 	TLabel *Label12;
 	TEdit *MeasErr6;
 	TEdit *MeasErr8;

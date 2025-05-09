@@ -12,10 +12,8 @@ object OptDialog: TOptDialog
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
-  OldCreateOrder = False
   Position = poMainFormCenter
   OnShow = FormShow
-  PixelsPerInch = 96
   TextHeight = 13
   object Label47: TLabel
     Left = 10
@@ -60,6 +58,7 @@ object OptDialog: TOptDialog
     ActivePage = TabSheet2
     Align = alTop
     TabOrder = 4
+    ExplicitWidth = 407
     object TabSheet1: TTabSheet
       Caption = 'Setting&1'
       object Label3: TLabel
@@ -92,10 +91,10 @@ object OptDialog: TOptDialog
       end
       object LabelFreq: TLabel
         Left = 24
-        Top = 29
-        Width = 119
+        Top = 32
+        Width = 58
         Height = 13
-        Caption = 'Frequencies / Filter Type'
+        Caption = 'Frequencies'
       end
       object LabelElMask: TLabel
         Left = 24
@@ -119,8 +118,8 @@ object OptDialog: TOptDialog
         Caption = 'Excluded Satellites (+PRN: Included)'
       end
       object BtnFreq: TSpeedButton
-        Left = 158
-        Top = 24
+        Left = 102
+        Top = 27
         Width = 18
         Height = 22
         Caption = '?'
@@ -136,7 +135,7 @@ object OptDialog: TOptDialog
         Caption = 'GPS'
         Checked = True
         State = cbChecked
-        TabOrder = 8
+        TabOrder = 7
       end
       object DynamicModel: TComboBox
         Left = 248
@@ -158,7 +157,7 @@ object OptDialog: TOptDialog
         Height = 21
         Style = csDropDownList
         ItemIndex = 0
-        TabOrder = 9
+        TabOrder = 8
         Text = 'OFF'
         Items.Strings = (
           'OFF'
@@ -176,7 +175,7 @@ object OptDialog: TOptDialog
         Height = 21
         Style = csDropDownList
         ItemIndex = 0
-        TabOrder = 5
+        TabOrder = 4
         Text = 'OFF'
         Items.Strings = (
           'OFF'
@@ -216,26 +215,6 @@ object OptDialog: TOptDialog
         Style = csDropDownList
         TabOrder = 1
         OnChange = FreqChange
-        Items.Strings = (
-          'L1'
-          'L1+L2/E5b'
-          'L1+L2/E5b+L5/E5a'
-          'L1+L2/E5b+L5/E5a+L6')
-      end
-      object Solution: TComboBox
-        Left = 325
-        Top = 26
-        Width = 75
-        Height = 21
-        Style = csDropDownList
-        Enabled = False
-        ItemIndex = 0
-        TabOrder = 4
-        Text = 'Forward'
-        Items.Strings = (
-          'Forward'
-          'Backward'
-          'Combined')
       end
       object SatEphem: TComboBox
         Left = 248
@@ -244,7 +223,7 @@ object OptDialog: TOptDialog
         Height = 21
         Style = csDropDownList
         ItemIndex = 0
-        TabOrder = 6
+        TabOrder = 5
         Text = 'Broadcast'
         Items.Strings = (
           'Broadcast'
@@ -259,7 +238,7 @@ object OptDialog: TOptDialog
         Top = 248
         Width = 179
         Height = 21
-        TabOrder = 7
+        TabOrder = 6
       end
       object NavSys2: TCheckBox
         Left = 68
@@ -267,7 +246,7 @@ object OptDialog: TOptDialog
         Width = 71
         Height = 17
         Caption = 'GLONASS'
-        TabOrder = 13
+        TabOrder = 12
         OnClick = NavSys2Click
       end
       object NavSys3: TCheckBox
@@ -276,7 +255,7 @@ object OptDialog: TOptDialog
         Width = 61
         Height = 17
         Caption = 'Galileo'
-        TabOrder = 10
+        TabOrder = 9
       end
       object NavSys4: TCheckBox
         Left = 190
@@ -284,7 +263,7 @@ object OptDialog: TOptDialog
         Width = 44
         Height = 23
         Caption = 'QZSS'
-        TabOrder = 11
+        TabOrder = 10
       end
       object NavSys5: TCheckBox
         Left = 338
@@ -292,7 +271,7 @@ object OptDialog: TOptDialog
         Width = 51
         Height = 17
         Caption = 'SBAS'
-        TabOrder = 12
+        TabOrder = 11
       end
       object TideCorr: TComboBox
         Left = 325
@@ -313,7 +292,7 @@ object OptDialog: TOptDialog
         Width = 69
         Height = 19
         Caption = 'BDS'
-        TabOrder = 23
+        TabOrder = 22
         OnClick = NavSys6Click
       end
       object ElMask: TComboBox
@@ -323,7 +302,7 @@ object OptDialog: TOptDialog
         Height = 21
         AutoComplete = False
         DropDownCount = 16
-        TabOrder = 14
+        TabOrder = 13
         Text = '15'
         Items.Strings = (
           '0'
@@ -348,7 +327,7 @@ object OptDialog: TOptDialog
         Width = 61
         Height = 17
         Caption = 'Sat PCV'
-        TabOrder = 15
+        TabOrder = 14
       end
       object PosOpt2: TCheckBox
         Left = 82
@@ -356,7 +335,7 @@ object OptDialog: TOptDialog
         Width = 62
         Height = 17
         Caption = 'Rec PCV'
-        TabOrder = 16
+        TabOrder = 15
       end
       object PosOpt3: TCheckBox
         Left = 142
@@ -364,7 +343,7 @@ object OptDialog: TOptDialog
         Width = 69
         Height = 17
         Caption = 'PhWU'
-        TabOrder = 17
+        TabOrder = 16
       end
       object PosOpt4: TCheckBox
         Left = 191
@@ -372,7 +351,7 @@ object OptDialog: TOptDialog
         Width = 68
         Height = 17
         Caption = 'Rej Ecl'
-        TabOrder = 18
+        TabOrder = 17
       end
       object PosOpt5: TCheckBox
         Left = 244
@@ -380,15 +359,15 @@ object OptDialog: TOptDialog
         Width = 68
         Height = 17
         Caption = 'RAIM FDE'
-        TabOrder = 19
+        TabOrder = 18
       end
       object BtnSnrMask: TButton
-        Left = 324
+        Left = 323
         Top = 47
         Width = 77
-        Height = 23
+        Height = 21
         Caption = '...'
-        TabOrder = 21
+        TabOrder = 20
         OnClick = BtnSnrMaskClick
       end
       object PosOpt6: TCheckBox
@@ -397,7 +376,7 @@ object OptDialog: TOptDialog
         Width = 68
         Height = 17
         Caption = 'DBCorr'
-        TabOrder = 20
+        TabOrder = 19
       end
       object NavSys7: TCheckBox
         Left = 284
@@ -405,7 +384,7 @@ object OptDialog: TOptDialog
         Width = 48
         Height = 19
         Caption = 'NavIC'
-        TabOrder = 22
+        TabOrder = 21
         OnClick = NavSys6Click
       end
     end
@@ -1149,7 +1128,7 @@ object OptDialog: TOptDialog
         object MeasErrR1: TEdit
           Left = 242
           Top = 12
-          Width = 47
+          Width = 36
           Height = 21
           TabOrder = 0
           Text = '100.0'
@@ -1163,7 +1142,7 @@ object OptDialog: TOptDialog
           Text = '0.003'
         end
         object MeasErr3: TEdit
-          Left = 321
+          Left = 318
           Top = 35
           Width = 73
           Height = 21
@@ -1179,19 +1158,27 @@ object OptDialog: TOptDialog
           Text = '0.000'
         end
         object MeasErrR2: TEdit
-          Left = 295
+          Left = 279
           Top = 12
-          Width = 50
+          Width = 36
           Height = 21
           TabOrder = 1
           Text = '100.0'
         end
         object MeasErrR5: TEdit
-          Left = 349
+          Left = 318
           Top = 12
-          Width = 45
+          Width = 34
           Height = 21
           TabOrder = 5
+          Text = '100.0'
+        end
+        object MeasErrR6: TEdit
+          Left = 355
+          Top = 12
+          Width = 36
+          Height = 21
+          TabOrder = 6
           Text = '100.0'
         end
       end
@@ -1288,7 +1275,7 @@ object OptDialog: TOptDialog
         Text = '0'
       end
       object MeasErr6: TEdit
-        Left = 324
+        Left = 321
         Top = 79
         Width = 73
         Height = 21
@@ -1987,7 +1974,7 @@ object OptDialog: TOptDialog
         Caption = 'Solution Font'
       end
       object FontLabel2: TLabel
-        Left = 265
+        Left = 253
         Top = 188
         Width = 80
         Height = 18
@@ -2001,6 +1988,7 @@ object OptDialog: TOptDialog
         Font.Style = []
         ParentFont = False
         Layout = tlCenter
+        ExplicitLeft = 265
       end
       object Label41: TLabel
         Left = 32
@@ -2059,7 +2047,7 @@ object OptDialog: TOptDialog
         Caption = 'Panel Font'
       end
       object FontLabel1: TLabel
-        Left = 265
+        Left = 253
         Top = 164
         Width = 80
         Height = 18
@@ -2073,6 +2061,7 @@ object OptDialog: TOptDialog
         Font.Style = []
         ParentFont = False
         Layout = tlCenter
+        ExplicitLeft = 265
       end
       object SvrCycleE: TEdit
         Left = 248
