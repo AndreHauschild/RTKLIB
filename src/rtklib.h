@@ -1018,7 +1018,7 @@ typedef struct {        /* option type */
 
 typedef struct {        /* SNR mask type */
     int ena[2];         /* enable flag {rover,base} */
-    double mask[NFREQ][9]; /* mask (dBHz) at 5,10,...85 deg */
+    double mask[MAXFREQ][9]; /* mask (dBHz) at 5,10,...85 deg */
 } snrmask_t;
 
 typedef struct {        /* processing options type */
@@ -1437,6 +1437,7 @@ EXPORT void matfprint(const double *A, int n, int m, int p, int q, FILE *fp);
 EXPORT void add_fatal(fatalfunc_t *func);
 
 /* time and string functions -------------------------------------------------*/
+EXPORT void    setstr(char *dst, const char *src, int n);
 EXPORT double  str2num(const char *s, int i, int n);
 EXPORT int     str2time(const char *s, int i, int n, gtime_t *t);
 EXPORT char    *time2str(gtime_t t, char str[40], int n);

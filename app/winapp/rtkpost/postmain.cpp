@@ -1216,14 +1216,14 @@ void __fastcall TMainForm::LoadOpt(void)
     OutputFile->Items  =ReadList(ini,"hist","outputfile");
     
     PosMode            =ini->ReadInteger("opt","posmode",        2);
-    Freq               =ini->ReadInteger("opt","freq",           1);
+    Freq               =ini->ReadInteger("opt","freq",           2);
     Solution           =ini->ReadInteger("opt","solution",       0);
     ElMask             =ini->ReadFloat  ("opt","elmask",      15.0);
     SnrMask.ena[0]     =ini->ReadInteger("opt","snrmask_ena1",   0);
     SnrMask.ena[1]     =ini->ReadInteger("opt","snrmask_ena2",   0);
-    for (int i=0;i<3;i++) for (int j=0;j<9;j++) {
+    for (int i=0;i<NFREQ;i++) for (int j=0;j<9;j++) {
         SnrMask.mask[i][j]=
-            ini->ReadFloat("opt",s.sprintf("snrmask_%d_%d",i+1,j+1),0.0);
+            ini->ReadFloat("opt",s.sprintf("snrmask_%d_%d",i+1,j+1),35.0);
     }
     IonoOpt            =ini->ReadInteger("opt","ionoopt",     IONOOPT_BRDC);
     TropOpt            =ini->ReadInteger("opt","tropopt",     TROPOPT_SAAS);
@@ -1232,7 +1232,7 @@ void __fastcall TMainForm::LoadOpt(void)
     TideCorr           =ini->ReadInteger("opt","tidecorr",       0);
     SatEphem           =ini->ReadInteger("opt","satephem",       0);
     ExSats             =ini->ReadString ("opt","exsats",        "");
-    NavSys             =ini->ReadInteger("opt","navsys",   SYS_GPS|SYS_GLO|SYS_GAL);
+    NavSys             =ini->ReadInteger("opt","navsys",   SYS_GPS|SYS_GLO|SYS_GAL|SYS_CMP);
     PosOpt[0]          =ini->ReadInteger("opt","posopt1",        0);
     PosOpt[1]          =ini->ReadInteger("opt","posopt2",        0);
     PosOpt[2]          =ini->ReadInteger("opt","posopt3",        0);
@@ -1243,7 +1243,7 @@ void __fastcall TMainForm::LoadOpt(void)
     
     AmbRes             =ini->ReadInteger("opt","ambres",         3);
     GloAmbRes          =ini->ReadInteger("opt","gloambres",      3);
-    BdsAmbRes          =ini->ReadInteger("opt","bdsambres",      0);
+    BdsAmbRes          =ini->ReadInteger("opt","bdsambres",      1);
     ValidThresAR       =ini->ReadFloat  ("opt","validthresar", 3.0);
     MaxPosVarAR        =ini->ReadFloat  ("opt","maxposvarar", 0.10);
     GloHwBias          =ini->ReadFloat  ("opt","glohwbias",   0.00);
@@ -1446,7 +1446,7 @@ void __fastcall TMainForm::SaveOpt(void)
     ini->WriteFloat  ("opt","elmask",      ElMask      );
     ini->WriteInteger("opt","snrmask_ena1",SnrMask.ena[0]);
     ini->WriteInteger("opt","snrmask_ena2",SnrMask.ena[1]);
-    for (int i=0;i<3;i++) for (int j=0;j<9;j++) {
+    for (int i=0;i<NFREQ;i++) for (int j=0;j<9;j++) {
         ini->WriteFloat("opt",s.sprintf("snrmask_%d_%d",i+1,j+1),
                         SnrMask.mask[i][j]);
     }
