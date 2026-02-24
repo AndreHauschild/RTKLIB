@@ -1195,7 +1195,7 @@ static int ppp_res(int post, const obsd_t *obs, int n, const double *rs,
                   str,post,sat,code?"P":"L",frq+1,res,sqrt(var[nv]),azel[1+i*2]*R2D);
 
             /* reject satellite by pre-fit residuals */
-            double maxinno = (post==-1?1000:10*opt->maxinno[code]);
+            double maxinno = (post==-1?1000:1)*opt->maxinno[code];
             if (post<=0&&opt->maxinno[code]>0.0&&fabs(res)>maxinno) {
                 trace(2,"outlier (%d) rejected %s sat=%2d %s%d res=%9.4f el=%4.1f\n",
                       post,str,sat,code?"P":"L",frq+1,res,azel[1+i*2]*R2D);
@@ -1364,7 +1364,7 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
         /* prefit residuals
          * NOTE: use different limit for pre-fit residuals in first iteration
          *       by using argument post = -1
-         * */
+         */
         if (!(nv=ppp_res(i==0?-1:0,obs,n,rs,dts,var,svh,dr,exc,nav,xp,rtk,v,H,R,azel))) {
             trace(2,"%s ppp (%d) no valid obs data\n",str,i+1);
             break;
