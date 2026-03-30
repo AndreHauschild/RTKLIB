@@ -472,7 +472,7 @@ static int readbiaf(const char *file, nav_t *nav)
         else if ((sys!=SYS_GAL&&obs1[1]=='2')||(sys==SYS_GAL&&obs1[1]=='5'))
             freq=1;
         else continue;
-        
+
         if (!(code1=obs2code(&obs1[1]))) continue; /* skip if code not valid */
         bias_ix1=code2bias_ix(sys,code1);
         if (strcmp(bias,"OSB")==0) {
