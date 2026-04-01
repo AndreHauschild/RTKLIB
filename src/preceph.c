@@ -57,10 +57,9 @@
 #define MAXDTE      900.0           /* max time difference to ephem time (s) */
 #define EXTERR_CLK  1E-3            /* extrapolation error for clock (m/s) */
 #define EXTERR_EPH  5E-7            /* extrapolation error for ephem (m/s^2) */
-#define MAX_BIAS_SYS 4              /* # of constellations supported */
 
 /* table to translate code to code bias table index  */
-static int8_t code_bias_ix[MAX_BIAS_SYS][MAXCODE];
+static int8_t code_bias_ix[NSYS][MAXCODE];
 /* initialize code bias lookup table -------------------------------------------
 *       -1 = code not supported
 *        0 = reference code (0 bias)
@@ -69,7 +68,7 @@ static int8_t code_bias_ix[MAX_BIAS_SYS][MAXCODE];
 static void init_bias_ix(void) {
     int i,j;
 
-    for (i=0;i<MAX_BIAS_SYS;i++) for (j=0;j<MAXCODE;j++)
+    for (i=0;i<NSYS;i++) for (j=0;j<MAXCODE;j++)
         code_bias_ix[i][j]=-1;
 
     /* GPS */
@@ -386,14 +385,14 @@ extern int readsap(const char *file, const gtime_t time, nav_t *nav) {
   return 1;
 }
 /* read DCB parameters from DCB file -------------------------------------------
-*    - supports satellite and receiver biases
+*    - supports satellite biases
 *-----------------------------------------------------------------------------*/
 static int readdcbf(const char *file, nav_t *nav, const sta_t *sta)
 {
     FILE *fp;
     double cbias;
     char buff[256],str1[32],str2[32]="";
-    int i,j,sat,type=0;
+    int sat,type=0;
 
     trace(3,"readdcbf: file=%s\n",file);
 
@@ -412,16 +411,17 @@ static int readdcbf(const char *file, nav_t *nav, const sta_t *sta)
         if ((cbias=str2num(buff,26,9))==0.0) continue;
 
         if (sta&&(!strcmp(str1,"G")||!strcmp(str1,"R"))) { /* receiver DCB */
-            for (i=0;i<MAXRCV;i++) {
-                if (!strcmp(sta[i].name,str2)) break;
-            }
-            if (i<MAXRCV) {
-                j=!strcmp(str1,"G")?0:1;
-                nav->rbias[i][j][type-1]=cbias*1E-9*CLIGHT; /* ns -> m */
-            }
+/* receiver DCBs never used in RTKLIB so remove support */
+//            for (i=0;i<MAXRCV;i++) {
+//                if (!strcmp(sta[i].name,str2)) break;
+//            }
+//            if (i<MAXRCV) {
+//                j=!strcmp(str1,"G")?0:1;
+//                nav->rbias[i][j][type-1]=cbias*1E-9*CLIGHT; /* ns -> m */
+//            }
         }
         else if ((sat=satid2no(str1))) { /* satellite dcb */
-            nav->cbias[sat-1][type-1][0]=cbias*1E-9*CLIGHT; /* ns -> m */
+            nav->cbias[sat-1][type-1][0]=-cbias*1E-9*CLIGHT; /* ns -> m */
         }
     }
     fclose(fp);
@@ -442,19 +442,24 @@ static int sys2ix(int sys)
     }
     return 0;
 }
-/* translate satellite system and code to code bias table index ----------------
-*       -1 = code not supported
-*        0 = reference code (0 bias)
-*        1-3 = table index for code
+/* lookup code bias from table ----------------
+*       return 0 if not found
+*       mode:  0=DCB or pseudo-DCB
+*              1=OSB or pseudo-OSB
 * ----------------------------------------------------------------------------*/
-extern int code2bias_ix(int sys, int code) {
-    int sys_ix;
+extern double code2bias(const nav_t *nav, int sys, int sat, int code, int mode) {
+    int sys_ix,frq_ix,code_ix;
+    double bias=0;
 
     sys_ix=sys2ix(sys);
-    if (sys_ix<MAX_BIAS_SYS)
-        return code_bias_ix[sys_ix][code];
-    else
-        return 0;
+    frq_ix=code2idx(sys,code);
+    if (frq_ix>=0&&sat<=MAXSAT) {
+        code_ix = code_bias_ix[sys_ix][code];
+        bias=nav->cbias[sat-1][frq_ix][code_ix];  // absolute bias
+        if (mode==0)
+            bias-=nav->cbias[sat-1][frq_ix][0];  // difference with reference
+    }
+    return bias;
 }
 /* Parse time in Bias-SINEX file -----------------------------------------------*/
 static gtime_t str2time_bsx(const char *s)
@@ -613,7 +618,7 @@ extern int readdcb(const char *file, nav_t *nav, const sta_t *sta)
 
     init_bias_ix(); /* init translation table from code to table column */
 
-    for (i=0;i<MAXSAT;i++) for (j=0;j<MAX_CODE_BIAS_FREQS;j++) for (k=0;k<MAX_CODE_BIASES;k++) {
+    for (i=0;i<MAXSAT;i++) for (j=0;j<NFREQ;j++) for (k=0;k<MAX_CODE_BIASES;k++) {
         nav->cbias[i][j][k]=0.0;
     }
     for (i=0;i<MAXEXFILE;i++) {

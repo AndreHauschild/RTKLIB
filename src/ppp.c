@@ -556,6 +556,7 @@ static void corr_meas(const obsd_t *obs, const nav_t *nav, const double *azel,
             P[i]-=biasCode;
             L[i]-=biasPhase;
         }
+        trace(4,"sys=%d sat=%d frq=%d, P: %.3f L: %.3f\n",sys,obs->sat,i,biasCode,biasPhase);
     }
     /* choose freqs for iono-free LC */
     *Lc=*Pc=0.0;
