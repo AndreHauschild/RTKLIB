@@ -136,7 +136,7 @@ Plot::Plot(QWidget *parent) : QMainWindow(parent), ui(new Ui::Plot)
 
     observationIndex = 0;
     observation = obs0;
-    memset(&navigation, 0, sizeof(navigation));
+    navigation = new nav_t{};
     station = sta0;
     gis = gis0;
     simulatedObservation = 0;
@@ -395,6 +395,8 @@ Plot::~Plot()
     delete lWRangeList;
 
     delete tVdirectorySelector;
+
+    delete navigation;
 }
 // callback on all events ----------------------------------------------------
 bool Plot::eventFilter(QObject *obj, QEvent *event)
@@ -1532,12 +1534,11 @@ void Plot::mouseDownSolution(int x, int y)
         graphTriple[0]->getLimits(xl, yl);
         graphTriple[0]->toPoint(x_pos, yl[1], pnt);
 
-        if ((x - pnt.x()) * (x - pnt.x()) + (y - pnt.y()) * (y - pnt.y()) < 5*5) {
+        double dx = x - pnt.x(), dy = y - pnt.y();
+        if (dx * dx + dy * dy < 5 * 5) {
             setCursor(Qt::SizeHorCursor);
-
             dragState = 20;
             refresh();
-
             return;
         }
     }
@@ -1582,7 +1583,8 @@ void Plot::mouseDownObservation(int x, int y)
         graphSingle->getLimits(xl, yl);
         graphSingle->toPoint(x_pos, yl[1], pnt);
 
-        if ((x - pnt.x()) * (x - pnt.x()) + (y - pnt.y()) * (y - pnt.y()) < 5*5) {
+        double dx = x - pnt.x(), dy = y - pnt.y();
+        if (dx * dx + dy * dy < 5 * 5) {
             setCursor(Qt::SizeHorCursor);
             dragState = 20;
             refresh();

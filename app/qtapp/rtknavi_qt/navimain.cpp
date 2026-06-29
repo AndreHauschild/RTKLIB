@@ -138,10 +138,12 @@ MainWindow::MainWindow(QWidget *parent)
 
     for (int i = 0; i < 2; i++)
         for (int j = 0; j < MAXSAT; j++) {
-            satellites[i][j] = validSatellites[i][j] = 0;
+            satellites[i][j] = 0;
             satellitesAzimuth[i][j] = satellitesElevation[i][j] = 0.0;
-            for (int k = 0; k < NFREQ; k++)
+            for (int k = 0; k < NFREQ; k++) {
+                validSatellites[i][j][k] = 0;
                 satellitesSNR[i][j][k] = 0;
+            }
         }
 
     static opt_t rcvopts[] = {
@@ -1662,8 +1664,8 @@ void MainWindow::drawSolutionPlot(QLabel *plot, int type, int freq)
 
     int w = buffer.size().width() - 2;
     int h = buffer.height() - 2;
-    int i, j, x, sat[2][MAXSAT], ns[2], snr[2][MAXSAT][NFREQ], vsat[2][MAXSAT];
-    int *snr0[MAXSAT], *snr1[MAXSAT], topMargin = QFontMetrics(optDialog->panelFont).height()*3/2;
+    int i, j, x, sat[2][MAXSAT], ns[2], snr[2][MAXSAT][NFREQ], vsat[2][MAXSAT][NFREQ];
+    int topMargin = QFontMetrics(optDialog->panelFont).height()*3/2;
     double az[2][MAXSAT], el[2][MAXSAT], rr[3], pos[3];
 
     trace(4, "drawSolutionPlot\n");
@@ -1672,12 +1674,8 @@ void MainWindow::drawSolutionPlot(QLabel *plot, int type, int freq)
         fstr[i + 1] = QStringLiteral("L%1").arg(i + 1);
     fstr[i + 1] = " SYS";
 
-    for (i = 0; i < MAXSAT; i++) {
-        snr0[i] = snr[0][i];
-        snr1[i] = snr[1][i];
-    }
-    ns[0] = rtksvrostat(rtksvr, 0, &time, sat[0], az[0], el[0], snr0, vsat[0]);
-    ns[1] = rtksvrostat(rtksvr, 1, &time, sat[1], az[1], el[1], snr1, vsat[1]);
+    ns[0] = rtksvrostat(rtksvr, 0, &time, sat[0], az[0], el[0], snr[0], vsat[0]);
+    ns[1] = rtksvrostat(rtksvr, 1, &time, sat[1], az[1], el[1], snr[1], vsat[1]);
 
     rtksvrlock(rtksvr);
     matcpy(rr, rtksvr->rtk.sol.rr, 3, 1);
@@ -1691,15 +1689,17 @@ void MainWindow::drawSolutionPlot(QLabel *plot, int type, int freq)
                 satellites[i][j] = sat[i][j];
                 satellitesAzimuth[i][j] = az[i][j];
                 satellitesElevation[i][j] = el[i][j];
-                for (int k = 0; k < NFREQ; k++)
+                for (int k = 0; k < NFREQ; k++) {
+                    validSatellites[i][j][k] = vsat[i][j][k];
                     satellitesSNR[i][j][k] = snr[i][j][k];
-                validSatellites[i][j] = vsat[i][j];
+                }
             }
         } else {
             for (j = 0; j < numSatellites[i]; j++) {
-                validSatellites[i][j] = 0;
-                for (int k = 0; k < NFREQ; k++)
+                for (int k = 0; k < NFREQ; k++) {
+                    validSatellites[i][j][k] = 0;
                     satellitesSNR[i][j][k] = 0;
+                }
             }
         }
     }
@@ -1861,7 +1861,10 @@ void MainWindow::drawSnr(QPainter &c, int w, int h, int x0, int y0,
             QRect r1(x1, y1, barWidth, -height);
             if (j == 0) {  // filled bar
                 c.setBrush(QBrush(freq < NFREQ + 1 ? snrColor(snr[snrIdx]) : color_sys[sysIdx], Qt::SolidPattern));
-                if (!validSatellites[index][i])
+                int any = 0;
+                for (int fi = 0; fi < NFREQ; fi++)
+                  if (validSatellites[index][i][fi]) { any = 1; break; }
+                if (!any)
                     c.setBrush(QBrush(QColor(QColorConstants::LightGray), Qt::SolidPattern));
             } else {  // outline only
                 c.setPen(j < NFREQ + 1 ? QColor(QColorConstants::LightGray) : Qt::darkGray);
@@ -1909,7 +1912,10 @@ void MainWindow::drawSatellites(QPainter &c, int w, int h, int x0, int y0,
                 snr[0] = snr[j + 1]; // max snr
             }
         }
-        if (validSatellites[index][k] && (freq > NFREQ || snr[freq] > 0)) {
+        int anyValidSatFreq = 0;
+        for (int fi = 0; fi < NFREQ; fi++)
+          if (validSatellites[index][k][fi]) { anyValidSatFreq = 1; break; }
+        if (anyValidSatFreq && (freq > NFREQ || snr[freq] > 0)) {
             azel[nsats * 2] = satellitesAzimuth[index][k];
             azel[nsats * 2 + 1] = satellitesElevation[index][k];
             nsats++;
@@ -1920,7 +1926,7 @@ void MainWindow::drawSatellites(QPainter &c, int w, int h, int x0, int y0,
         y[i] = static_cast<int>(p.y() - r * (90 - satellitesElevation[index][k] * R2D) / 90 * cos(satellitesAzimuth[index][k])) + y0;
         radius = QFontMetrics(optDialog->panelFont).height();
 
-        c.setBrush(!validSatellites[index][k] ? Color::Silver :
+        c.setBrush(!anyValidSatFreq ? Color::Silver :
                         (freq < NFREQ + 1 ? snrColor(snr[freq]) : color_sys[sysIdx]));
         c.setPen(Qt::darkGray);
         color_text = Qt::white;
@@ -2351,7 +2357,7 @@ void MainWindow::loadNavigation(nav_t *nav)
     QString str;
     eph_t eph0;
     char buff[2049], *p;
-    long toe_time,toc_time,ttr_time;
+    long unsigned toe_time,toc_time,ttr_time;
     int i;
 
     trace(3, "loadNavigation\n");
@@ -2359,13 +2365,13 @@ void MainWindow::loadNavigation(nav_t *nav)
     memset(&eph0, 0, sizeof(eph_t));
 
     for (i = 0; i < 2 * MAXSAT; i++) {
-        if ((str = settings.value(QString("navi/eph_%1").arg(i, 2)).toString()).isEmpty()) continue;
+        if ((str = settings.value(QString("navi/eph_%1").arg(i, 3, 10, QChar('0'))).toString()).isEmpty()) continue;
         nav->eph[i] = eph0;
         strncpy(buff, qPrintable(str), 2047);
         if (!(p = strchr(buff, ','))) continue;
         *p = '\0';
         if (!(nav->eph[i].sat = satid2no(buff))) continue;
-        sscanf(p + 1, "%d,%d,%d,%d,%ld,%ld,%ld,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%d,%d,%lf",
+        sscanf(p + 1, "%d,%d,%d,%d,%lu,%lu,%lu,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%d,%d,%lf",
                &nav->eph[i].iode,
                &nav->eph[i].iodc,
                &nav->eph[i].sva,
@@ -2434,9 +2440,9 @@ void MainWindow::saveNavigation(nav_t *nav)
         str = str + QString("%1,").arg(nav->eph[i].iodc);
         str = str + QString("%1,").arg(nav->eph[i].sva);
         str = str + QString("%1,").arg(nav->eph[i].svh);
-        str = str + QString("%1,").arg(static_cast<int>(nav->eph[i].toe.time));
-        str = str + QString("%1,").arg(static_cast<int>(nav->eph[i].toc.time));
-        str = str + QString("%1,").arg(static_cast<int>(nav->eph[i].ttr.time));
+        str = str + QString("%1,").arg(static_cast<long unsigned>(nav->eph[i].toe.time));
+        str = str + QString("%1,").arg(static_cast<long unsigned>(nav->eph[i].toc.time));
+        str = str + QString("%1,").arg(static_cast<long unsigned>(nav->eph[i].ttr.time));
         str = str + QString("%1,").arg(nav->eph[i].A, 0, 'E', 14);
         str = str + QString("%1,").arg(nav->eph[i].e, 0, 'E', 14);
         str = str + QString("%1,").arg(nav->eph[i].i0, 0, 'E', 14);
@@ -2461,7 +2467,7 @@ void MainWindow::saveNavigation(nav_t *nav)
         str = str + QString("%1,").arg(nav->eph[i].code);
         str = str + QString("%1,").arg(nav->eph[i].flag);
         str = str + QString("%1,").arg(nav->eph[i].tgd[1],0,'E',14);
-        settings.setValue(QString("navi/eph_%1").arg(i, 2), str);
+        settings.setValue(QString("navi/eph_%1").arg(i, 3, 10, QChar('0')), str);
     }
     str = "";
     for (i = 0; i < 8; i++) str = str + QString("%1,").arg(nav->ion_gps[i], 0, 'E', 14);
@@ -2544,6 +2550,7 @@ void MainWindow::loadOptions()
     frequencyType[1] = settings.value("setting/freqtype2", 0).toInt();
     frequencyType[2] = settings.value("setting/freqtype3", 0).toInt();
     frequencyType[3] = settings.value("setting/freqtype4", 0).toInt();
+    for (int i = 0; i < 4; i++) if (frequencyType[i] > NFREQ + 1) frequencyType[i] = 0;
     baselineMode[0] = settings.value("setting/blmode1", 0).toInt();
     baselineMode[1] = settings.value("setting/blmode2", 0).toInt();
     baselineMode[2] = settings.value("setting/blmode3", 0).toInt();

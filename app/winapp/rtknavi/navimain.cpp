@@ -138,9 +138,12 @@ __fastcall TMainForm::TMainForm(TComponent* Owner)
     SolCurrentStat=0;
     SolRov=SolRef=Qr=VelRov=Age=Ratio=NULL;
     for (int i=0;i<2;i++) for (int j=0;j<MAXSAT;j++) {
-        Sat[i][j]=Vsat[i][j]=0;
+        Sat[i][j]=0;
         Az[i][j]=El[i][j]=0.0;
-        for (int k=0;k<NFREQ;k++) Snr[i][j][k]=0;
+        for (int k=0;k<NFREQ;k++) {
+          Snr[i][j][k]=0;
+          Vsat[i][j][k]=0;
+        }
     }
     PrcOpt=prcopt_default;
     SolOpt=solopt_default;
@@ -1666,8 +1669,8 @@ void __fastcall TMainForm::DrawPlot(TImage *plot, int type, int freq)
     TCanvas *c=plot->Canvas;
     TLabel *label[]={Plabel1,Plabel2,Plabel3,Pos1,Pos2,Pos3};
     int w=plot->Parent->Width-2,h=plot->Parent->Height-2;
-    int i,j,x,sat[2][MAXSAT],ns[2],snr[2][MAXSAT][NFREQ],vsat[2][MAXSAT];
-    int *snr0[MAXSAT],*snr1[MAXSAT],tm=PanelFont->Size*3/2;
+    int i,j,x,sat[2][MAXSAT],ns[2],snr[2][MAXSAT][NFREQ],vsat[2][MAXSAT][NFREQ];
+    int tm=PanelFont->Size*3/2;
     char name[16];
     double az[2][MAXSAT],el[2][MAXSAT],rr[3],rs[6],e[3],pos[3],azel[2];
     
@@ -1678,12 +1681,8 @@ void __fastcall TMainForm::DrawPlot(TImage *plot, int type, int freq)
     }
     fstr[i+1]=" SYS";
     
-    for (i=0;i<MAXSAT;i++) {
-        snr0[i]=snr[0][i];
-        snr1[i]=snr[1][i];
-    }
-    ns[0]=rtksvrostat(&rtksvr,0,&time,sat[0],az[0],el[0],snr0,vsat[0]);
-    ns[1]=rtksvrostat(&rtksvr,1,&time,sat[1],az[1],el[1],snr1,vsat[1]);
+    ns[0]=rtksvrostat(&rtksvr,0,&time,sat[0],az[0],el[0],snr[0],vsat[0]);
+    ns[1]=rtksvrostat(&rtksvr,1,&time,sat[1],az[1],el[1],snr[1],vsat[1]);
     
     rtksvrlock(&rtksvr);
     matcpy(rr,rtksvr.rtk.sol.rr,3,1);
@@ -1698,15 +1697,15 @@ void __fastcall TMainForm::DrawPlot(TImage *plot, int type, int freq)
                 Az  [i][j]=az  [i][j];
                 El  [i][j]=el  [i][j];
                 for (int k=0;k<NFREQ;k++) {
+                    Vsat[i][j][k]=vsat[i][j][k];
                     Snr[i][j][k]=snr[i][j][k];
                 }
-                Vsat[i][j]=vsat[i][j];
             }
         }
         else {
             for (j=0;j<Nsat[i];j++) {
-                Vsat[i][j]=0;
                 for (int k=0;k<NFREQ;k++) {
+                    Vsat[i][j][k]=0;
                     Snr[i][j][k]=0;
                 }
             }
@@ -1884,7 +1883,10 @@ void __fastcall TMainForm::DrawSnr(TCanvas *c, int w, int h, int x0, int y0,
             if (j==0) {
                 c->Brush->Style=bsSolid;
                 c->Brush->Color=freq<NFREQ+1?SnrColor(snr[k]):color_sys[l];
-                if (!Vsat[index][i]) c->Brush->Color=clSilver;
+                int any = 0;
+                for (int fi = 0; fi < NFREQ; fi++)
+                  if (Vsat[index][i][fi]) { any = 1; break; }
+                if (!any) c->Brush->Color=clSilver;
                 c->Rectangle(r1);
             }
             else {
@@ -1929,7 +1931,10 @@ void __fastcall TMainForm::DrawSat(TCanvas *c, int w, int h, int x0, int y0,
                 snr[0]=snr[j+1]; // max snr
             }
         }
-        if (Vsat[index][k]&&(freq>NFREQ||snr[freq]>0)) {
+        int anyvsatf = 0;
+        for (int fi = 0; fi < NFREQ; fi++)
+          if (Vsat[index][k][fi]) { anyvsatf = 1; break; }
+        if (anyvsatf && (freq > NFREQ || snr[freq] > 0)) {
             azel[ns*2]=Az[index][k]; azel[1+ns*2]=El[index][k];
             ns++;
         }
@@ -1938,7 +1943,7 @@ void __fastcall TMainForm::DrawSat(TCanvas *c, int w, int h, int x0, int y0,
         x[i]=(int)(p.x+r*(90-El[index][k]*R2D)/90*sin(Az[index][k]))+x0;
         y[i]=(int)(p.y-r*(90-El[index][k]*R2D)/90*cos(Az[index][k]))+y0;
         d=PanelFont->Size*3/2;
-        c->Brush->Color=!Vsat[index][k]?clSilver:
+        c->Brush->Color=!anyvsatf?clSilver:
                         (freq<NFREQ+1?SnrColor(snr[freq]):color_sys[l]);
         c->Brush->Style=bsSolid;
         c->Pen->Color=clGray;
@@ -2323,19 +2328,19 @@ void __fastcall TMainForm::LoadNav(nav_t *nav)
     AnsiString str,s;
     eph_t eph0={0};
     char buff[2049],id[32],*p;
-    long toe_time,toc_time,ttr_time;
+    long unsigned toe_time,toc_time,ttr_time;
     int i;
     
     trace(3,"LoadNav\n");
     
     for (i=0;i<MAXSAT*2;i++) {
-        if ((str=ini->ReadString("navi",s.sprintf("eph_%02d",i),""))=="") continue;
+        if ((str=ini->ReadString("navi",s.sprintf("eph_%03d",i),""))=="") continue;
         nav->eph[i]=eph0;
         strcpy(buff,str.c_str());
         if (!(p=strchr(buff,','))) continue;
         *p='\0';
         if (!(nav->eph[i].sat=satid2no(buff))) continue;
-        sscanf(p+1,"%d,%d,%d,%d,%ld,%ld,%ld,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%d,%d,%lf",
+        sscanf(p+1,"%d,%d,%d,%d,%lu,%lu,%lu,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%d,%d,%lf",
                &nav->eph[i].iode,
                &nav->eph[i].iodc,
                &nav->eph[i].sva ,
@@ -2404,9 +2409,9 @@ void __fastcall TMainForm::SaveNav(nav_t *nav)
         str=str+s.sprintf("%d,",nav->eph[i].iodc);
         str=str+s.sprintf("%d,",nav->eph[i].sva);
         str=str+s.sprintf("%d,",nav->eph[i].svh);
-        str=str+s.sprintf("%d,",(int)nav->eph[i].toe.time);
-        str=str+s.sprintf("%d,",(int)nav->eph[i].toc.time);
-        str=str+s.sprintf("%d,",(int)nav->eph[i].ttr.time);
+        str=str+s.sprintf("%lu,",(long unsigned)nav->eph[i].toe.time);
+        str=str+s.sprintf("%lu,",(long unsigned)nav->eph[i].toc.time);
+        str=str+s.sprintf("%lu,",(long unsigned)nav->eph[i].ttr.time);
         str=str+s.sprintf("%.14E,",nav->eph[i].A);
         str=str+s.sprintf("%.14E,",nav->eph[i].e);
         str=str+s.sprintf("%.14E,",nav->eph[i].i0);
@@ -2431,7 +2436,7 @@ void __fastcall TMainForm::SaveNav(nav_t *nav)
         str=str+s.sprintf("%d,",nav->eph[i].code);
         str=str+s.sprintf("%d,",nav->eph[i].flag);
         str=str+s.sprintf("%.14E,",nav->eph[i].tgd[1]);
-        ini->WriteString("navi",s.sprintf("eph_%02d",i),str);
+        ini->WriteString("navi",s.sprintf("eph_%03d",i),str);
     }
     str="";
     for (i=0;i<8;i++) str=str+s.sprintf("%.14E,",nav->ion_gps[i]);
@@ -2489,6 +2494,7 @@ void __fastcall TMainForm::LoadOpt(void)
     }
     PrcOpt.mode     =ini->ReadInteger("prcopt", "mode",            2);
     PrcOpt.nf       =ini->ReadInteger("prcopt", "nf",          NFREQ);
+    if (PrcOpt.nf > NFREQ) PrcOpt.nf = NFREQ;
     PrcOpt.elmin    =ini->ReadFloat  ("prcopt", "elmin",    15.0*D2R);
     PrcOpt.snrmask.ena[0]=ini->ReadInteger("prcopt","snrmask_ena1",0);
     PrcOpt.snrmask.ena[1]=ini->ReadInteger("prcopt","snrmask_ena2",0);
@@ -2648,6 +2654,10 @@ void __fastcall TMainForm::LoadOpt(void)
     FreqType2       =ini->ReadInteger("setting","freqtype2",       0);
     FreqType3       =ini->ReadInteger("setting","freqtype3",       0);
     FreqType4       =ini->ReadInteger("setting","freqtype4",       0);
+    if (FreqType1 > NFREQ + 1) FreqType1 = 0;
+    if (FreqType2 > NFREQ + 1) FreqType2 = 0;
+    if (FreqType3 > NFREQ + 1) FreqType3 = 0;
+    if (FreqType4 > NFREQ + 1) FreqType4 = 0;
     BLMode1         =ini->ReadInteger("setting","blmode1",         0);
     BLMode2         =ini->ReadInteger("setting","blmode2",         0);
     BLMode3         =ini->ReadInteger("setting","blmode3",         0);
