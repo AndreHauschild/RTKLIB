@@ -103,11 +103,12 @@ static int checkpri(const char* opt, int sys, int code, int idx)
 
     if (sys == SYS_GPS) {
         if (strstr(opt, "-GL1L") && idx == 0) return (code == CODE_L1L) ? 0 : -1;
-        if (strstr(opt, "-GL2S") && idx == 1) return (code == CODE_L2X) ? 1 : -1;
-        if (strstr(opt, "-GL2P") && idx == 1) return (code == CODE_L2P) ? 1 : -1;
+        if (strstr(opt, "-GL2S") && idx == 1) return (code == CODE_L2S) ? 1 : -1;
+        if (strstr(opt, "-GL2L") && idx == 1) return (code == CODE_L2L) ? 1 : -1;
+        if (strstr(opt, "-GL2P") && idx == 1) return (code == CODE_L2W) ? 1 : -1;
         if (code == CODE_L1L) return (nex < 1) ? -1 : NFREQ;
         if (code == CODE_L2S) return (nex < 2) ? -1 : NFREQ + 1;
-        if (code == CODE_L2P) return (nex < 3) ? -1 : NFREQ + 2;
+        if (code == CODE_L2L) return (nex < 3) ? -1 : NFREQ + 2;
     }
     else if (sys == SYS_GLO) {
         if (strstr(opt, "-RL2C") && idx == 1) return (code == CODE_L2C) ? 1 : -1;
@@ -218,18 +219,18 @@ static int sig2code(int sys, int sigtype, int l2c)
 
 static int decode_track_stat(uint32_t stat, int* sys, int* code, int* plock, int* clock)
 {
-    int satsys, sigtype, idx = -1;
+    int sigtype, idx = -1;
     int l2c;
 
     *code = CODE_NONE;
     *plock = (stat >> 10) & 1;
     *clock = (stat >> 12) & 1;
-    satsys = (stat >> 16) & 7;
+    unsigned sysno = (stat >> 16) & 7;
     sigtype = (stat >> 21) & 0x1F;
     l2c = (stat >> 26) & 0x01;
 
 
-    switch (satsys) {
+    switch (sysno) {
     case 0: *sys = SYS_GPS; break;
     case 1: *sys = SYS_GLO; break;
     case 2: *sys = SYS_SBS; break;
@@ -238,7 +239,7 @@ static int decode_track_stat(uint32_t stat, int* sys, int* code, int* plock, int
     case 5: *sys = SYS_QZS; break;
     case 6: *sys = SYS_IRN; break;
     default:
-        trace(2, "unicore unknown system: sys=%d\n", satsys);
+        trace(2, "unicore unknown system: sysno=%u\n", sysno);
         return -1;
     }
     if (!(*code = sig2code(*sys, sigtype, l2c)) || (idx = code2idx(*sys, *code)) < 0) {
@@ -497,14 +498,12 @@ static int decode_bdsephb(raw_t* raw)
 {
     eph_t eph = { 0 };
     uint8_t* p = raw->buff + HLEN;
-    double ura;
-    int prn, sat, toc;
 
     if (raw->len < HLEN + 232) {
         trace(2, "unicore bdsephb length error: len=%d\n", raw->len);
         return -1;
     }
-    prn = U4(p);   p += 4;
+    int prn = U4(p);   p += 4;
     double tow = R8(p); p += 8;
     (void)tow;
     eph.svh = U4(p); p += 4;
@@ -532,7 +531,7 @@ static int decode_bdsephb(raw_t* raw)
     eph.OMGd = R8(p);   p += 8;
 
     eph.iodc = U4(p); p += 4;
-    toc = R8(p);   p += 8;
+    double toc = R8(p);   p += 8;
 
     eph.tgd[0] = R8(p);   p += 8; /* TGD1 for B1 (s) */
     eph.tgd[1] = R8(p);   p += 8; /* TGD2 for B2 (s) */
@@ -545,10 +544,10 @@ static int decode_bdsephb(raw_t* raw)
     (void)as;
     double N = R8(p);   p += 8;
     (void)N;
-    ura = R8(p);   p += 8;
+    double ura = R8(p);   p += 8;
 
-
-    if (!(sat = satno(SYS_CMP, prn))) {
+    int sat = satno(SYS_CMP, prn);
+    if (!sat) {
         trace(2, "unicore bdsephb satellite error: prn=%d\n", prn);
         return -1;
     }
@@ -818,14 +817,14 @@ static int decode_obsvmb(raw_t* raw)
             raw->obs.data[index].L[idx] = -adr;
             raw->obs.data[index].P[idx] = psr;
             raw->obs.data[index].D[idx] = (float)dop;
-            raw->obs.data[index].SNR[idx] = snr;
+            raw->obs.data[index].SNR[idx] = (float)snr;
             raw->obs.data[index].LLI[idx] = (uint8_t)lli;
             raw->obs.data[index].code[idx] = (uint8_t)code;
             if (rcvstds) {
                 double pstd = U2(p + 20) * 0.01;  // Meters
-                raw->obs.data[index].Pstd[idx] = pstd;
+                raw->obs.data[index].Pstd[idx] = (float)pstd;
                 double lstd = U2(p + 22) * 0.0001; // Cycles
-                raw->obs.data[index].Lstd[idx] = lstd;
+                raw->obs.data[index].Lstd[idx] = (float)lstd;
             }
         }
     }

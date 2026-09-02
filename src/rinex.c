@@ -671,11 +671,31 @@ static int readrnxh(FILE *fp, double *ver, char *type, int *sys, int *tsys,
         }
         else if (strstr(label,"RINEX VERSION / TYPE")) {
             *ver=str2num(buff,0,9);
-            // Format change for clock files >=3.04
-            *type=(*ver<3.04||flag==0)?*(buff+20):*(buff+21);
+            char sc;
+            if (*ver >= 3.04) {
+              // The format changed for clock files >=3.04.
+              if (flag == 1) { // Expecting a clock file.
+                *type = buff[21];
+                sc = buff[42];
+                if (*type != 'C') {
+                  *type = buff[20];
+                  sc = buff[40];
+                }
+              } else { // Not expecting a clock file.
+                *type = buff[20];
+                sc = buff[40];
+                if (*type == ' ' && buff[21] == 'C') {
+                  *type = buff[21];
+                  sc = buff[42];
+                }
+              }
+            } else {
+              *type = buff[20];
+              sc = buff[40];
+            }
 
             // Satellite system
-            switch ((*ver<3.04||flag==0)?*(buff+40):*(buff+42)) {
+            switch (sc) {
                 case ' ':
                 case 'G': *sys=SYS_GPS;  *tsys=TSYS_GPS; break;
                 case 'R': *sys=SYS_GLO;  *tsys=TSYS_UTC; break;
@@ -686,7 +706,7 @@ static int readrnxh(FILE *fp, double *ver, char *type, int *sys, int *tsys,
                 case 'I': *sys=SYS_IRN;  *tsys=TSYS_IRN; break; /* v.3.03 */
                 case 'M': *sys=SYS_NONE; *tsys=TSYS_GPS; break; /* mixed */
                 default :
-                    trace(2,"not supported satellite system: %c\n",*(buff+40));
+                    trace(2,"not supported satellite system: %c\n", sc);
                     break;
             }
             continue;
@@ -895,14 +915,14 @@ static int decode_obsdata(FILE *fp, char *buff, double ver, int mask,
         switch (ind->type[i]) {
             case 0: obs->P[p[i]]=val[i];
                     obs->code[p[i]]=ind->code[i];
-                    obs->Pstd[p[i]] = std[i] > 0 ? 0.01 * pow(2, std[i] + 5) : 0;
+                    obs->Pstd[p[i]] = std[i] > 0 ? (float)(0.01 * pow(2, std[i] + 5)) : 0.0f;
                     break;
             case 1: obs->L[p[i]]=val[i];
                     obs->LLI[p[i]]=lli[i];
-                    obs->Lstd[p[i]] = std[i] > 0 ? std[i] * 0.004 : 0;
+                    obs->Lstd[p[i]] = std[i] > 0 ? (float)(std[i] * 0.004) : 0.0f;
                     break;
             case 2: obs->D[p[i]]=(float)val[i]; break;
-            case 3: obs->SNR[p[i]]=val[i]; break;
+            case 3: obs->SNR[p[i]]=(float)val[i]; break;
         }
         trace(4, "obs: i=%d f=%d P=%14.3f L=%14.3f LLI=%d code=%d\n",i,p[i],obs->P[p[i]],
         obs->L[p[i]],obs->LLI[p[i]],obs->code[p[i]]);
@@ -914,17 +934,15 @@ static int decode_obsdata(FILE *fp, char *buff, double ver, int mask,
 /* save cycle slips ----------------------------------------------------------*/
 static void saveslips(uint8_t slips[][NFREQ+NEXOBS], obsd_t *data)
 {
-    int i;
-    for (i=0;i<NFREQ+NEXOBS;i++) {
-        if (data->LLI[i]&1) slips[data->sat-1][i]|=LLI_SLIP;
+    for (int i=0;i<NFREQ+NEXOBS;i++) {
+        if (data->LLI[i]&LLI_SLIP) slips[data->sat-1][i]=1;
     }
 }
 /* restore cycle slips -------------------------------------------------------*/
 static void restslips(uint8_t slips[][NFREQ+NEXOBS], obsd_t *data)
 {
-    int i;
-    for (i=0;i<NFREQ+NEXOBS;i++) {
-        if (slips[data->sat-1][i]&1) data->LLI[i]|=LLI_SLIP;
+    for (int i=0;i<NFREQ+NEXOBS;i++) {
+        if (slips[data->sat-1][i]!=0) data->LLI[i]|=LLI_SLIP;
         slips[data->sat-1][i]=0;
     }
 }
@@ -1121,7 +1139,7 @@ static int readrnxobs(FILE *fp, gtime_t ts, gtime_t te, double tint,
 
     if (!obs||rcv>MAXRCV) return 0;
 
-    if (!(data=(obsd_t *)malloc(sizeof(obsd_t)*MAXOBS))) return 0;
+    if (!(data=(obsd_t *)malloc(sizeof(obsd_t)*MAXOBS))) return -1;
 
     /* read RINEX observation data body */
     while ((n=readrnxobsb(fp,opt,ver,tsys,tobs,&flag,data,sta))>=0&&stat>=0) {
@@ -1332,7 +1350,7 @@ static int decode_geph(double ver, int sat, gtime_t toc, double *data,
     if (ver >= 3.05) {
       geph->flags = (int)data[15]; // Status flags
       geph->dtaun = data[16];
-      geph->sva = data[17];
+      geph->sva = (int)data[17];
       geph->svh |= ((int)data[18]) << 1; // Extended SVH
     }
     /* some receiver output >128 for minus frequency number */
@@ -1538,34 +1556,33 @@ static int readrnxnav(FILE *fp, const char *opt, double ver, int sys,
 /* read RINEX clock ----------------------------------------------------------*/
 static int readrnxclk(FILE *fp, const char *opt, double ver, int index, nav_t *nav)
 {
-    pclk_t *nav_pclk;
-    gtime_t time;
-    double data[2];
-    int i,j,sat,mask,off;
-    char buff[MAXRNXLEN],satid[8]="";
-
     trace(3,"readrnxclk: index=%d\n", index);
 
     if (!nav) return 0;
 
+    pclk_t *nav_pclk;
+    char buff[MAXRNXLEN];
     /* set system mask */
-    mask=set_sysmask(opt);
-    off=ver>=3.04?5:0; /* format change for ver>=3.04 */
+    int mask=set_sysmask(opt);
+    int off=ver>=3.04?5:0; /* format change for ver>=3.04 */
 
     while (fgets(buff,sizeof(buff),fp)) {
-
+        gtime_t time;
         if (str2time(buff,8+off,26,&time)) {
             trace(2,"rinex clk invalid epoch: %34.34s\n",buff);
             continue;
         }
+        char satid[8]="";
         memcpy(satid,buff+3,4);
 
         /* only read AS (satellite clock) record */
+        int sat;
         if (strncmp(buff,"AS",2)||!(sat=satid2no(satid))) continue;
 
         if (!(satsys(sat,NULL)&mask)) continue;
 
-        for (i=0,j=40+off;i<2;i++,j+=20) data[i]=str2num(buff,j,19);
+        double data[2];
+        for (int i=0,j=40+off;i<2;i++,j+=20) data[i]=str2num(buff,j,19);
 
         if (nav->nc>=nav->ncmax) {
             nav->ncmax+=1024;
@@ -1580,7 +1597,7 @@ static int readrnxclk(FILE *fp, const char *opt, double ver, int index, nav_t *n
             nav->nc++;
             nav->pclk[nav->nc-1].time =time;
             nav->pclk[nav->nc-1].index=index;
-            for (i=0;i<MAXSAT;i++) {
+            for (int i=0;i<MAXSAT;i++) {
                 nav->pclk[nav->nc-1].clk[i][0]=0.0;
                 nav->pclk[nav->nc-1].std[i][0]=0.0f;
             }
@@ -1588,6 +1605,40 @@ static int readrnxclk(FILE *fp, const char *opt, double ver, int index, nav_t *n
         nav->pclk[nav->nc-1].clk[sat-1][0]=data[0];
         nav->pclk[nav->nc-1].std[sat-1][0]=(float)data[1];
     }
+
+    // Interpolate the standard deviations. The standard deviations can be
+    // supplied at a lower rate than the clock biases, e.g. 30 sec biases with
+    // 5 minute standard deviations.
+    for (int k = 0; k < MAXSAT; k++) {
+      int last_std_idx = -1;
+      for (int i = 0; i < nav->nc; i++) {
+        double std = nav->pclk[i].std[k][0];
+        if (std > 0) {
+          if (last_std_idx < 0) {
+            for (int j = 0; j < i; j++)
+              if (nav->pclk[j].clk[k][0] != 0) nav->pclk[j].std[k][0] = (float)std;
+          } else {
+            // Linear interpolation of the variance.
+            for (int j = last_std_idx + 1; j < i; j++) {
+              if (nav->pclk[j].clk[k][0] != 0) {
+                double last_std = nav->pclk[last_std_idx].std[k][0];
+                double t0 = timediff(nav->pclk[j].time, nav->pclk[last_std_idx].time);
+                double t1 = timediff(nav->pclk[j].time, nav->pclk[i].time);
+                double var = (SQR(std) * t0 - SQR(last_std) * t1) / (t0 - t1);
+                nav->pclk[j].std[k][0] = (float)sqrt(var);
+              }
+            }
+          }
+          last_std_idx = i;
+        }
+      }
+      if (last_std_idx >= 0) {
+        double last_std = nav->pclk[last_std_idx].std[k][0];
+        for (int j = last_std_idx + 1; j < nav->nc; j++)
+          if (nav->pclk[j].clk[k][0] != 0) nav->pclk[j].std[k][0] = (float)last_std;
+      }
+    }
+
     return nav->nc>0;
 }
 /* read RINEX file -----------------------------------------------------------*/
@@ -1679,7 +1730,7 @@ extern int rnxcomment(rnxopt_t *opt, const char *format, ...) {
         if (!*opt->comment[i]) break;
     }
     // Copy while wrapping overflow into the next comment line.
-    for (int j = 0, rem = strlen(buff); rem > 0; i++) {
+    for (int j = 0, rem = (int)strlen(buff); rem > 0; i++) {
         if (i >= MAXCOMMENT) return 0;
         int indent = j > 0 ? 2 : 0; // Indent overflow lines
         int n = rem > 60 - indent ? 60 - indent : rem;
@@ -2321,7 +2372,7 @@ static void outrnxobsf(FILE *fp, double obs, int lli, int std)
 static int obsindex(int rnxver, int sys, const uint8_t *code, const char *tobs,
                     const char *mask)
 {
-    char *id;
+    const char *id;
     int i;
 
     for (i=0;i<NFREQ+NEXOBS;i++) {
@@ -2502,13 +2553,13 @@ extern int outrnxobsb(FILE *fp, const rnxopt_t *opt, const obsd_t *obs, int n,
                 case 'P': {
                   // To RTKLib RINEX encoding
                   float std = obs[ind[i]].Pstd[k];
-                  int stdi = std > 0.0003125 ? log2(std * 100) - 5 + 0.5 : 0;
+                  int stdi = std > 0.0003125 ? (int)trunc(log2(std * 100) - 5 + 0.5) : 0;
                   outrnxobsf(fp,obs[ind[i]].P[k],-1,stdi);
                   break;
                 }
                 case 'L': {
                   // To RTKLib RINEX encoding
-                  int lstdi = obs[ind[i]].Lstd[k] / 0.004 + 0.5;
+                  int lstdi = (int)trunc(obs[ind[i]].Lstd[k] / 0.004 + 0.5);
                   outrnxobsf(fp,obs[ind[i]].L[k]+dL,obs[ind[i]].LLI[k],lstdi);
                   break;
                 }

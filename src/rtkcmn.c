@@ -203,7 +203,7 @@ const double chisqr[100]={      /* chi-sqr(n) (alpha=0.001) */
 };
 const prcopt_t prcopt_default={ /* defaults processing options */
     PMODE_KINEMA,SOLTYPE_FORWARD, /* mode,soltype */
-    2,SYS_GPS|SYS_GLO|SYS_GAL,  /* nf, navsys */
+    2,SYS_GPS|SYS_GLO|SYS_GAL|SYS_CMP,  /* nf, navsys */
     15.0*D2R,{{0,0}},           /* elmin,snrmask */
     0,3,3,1,0,1,                /* sateph,modear,glomodear,gpsmodear,bdsmodear,arfilter */
     20,0,4,5,10,20,             /* maxout,minlock,minfixsats,minholdsats,mindropsats,minfix */
@@ -255,8 +255,8 @@ const char *formatstrs[32]={    /* stream format strings */
     NULL
 };
 
-static char *obscodes[MAXCODE + 1]={       /* observation code strings */
-
+// Observation code strings.
+static const char *obscodes[MAXCODE + 1]={
     ""  ,"1C","1P","1W","1Y", "1M","1N","1S","1L","1E", /*  0- 9 */
     "1A","1B","1X","1Z","2C", "2D","2S","2L","2X","2P", /* 10-19 */
     "2W","2Y","2M","2N","5I", "5Q","5X","7I","7Q","7X", /* 20-29 */
@@ -602,7 +602,7 @@ extern uint8_t obs2code(const char *obs)
 * return : obs code string ("1C","1P","1P",...)
 * notes  : obs codes are based on RINEX 3.04
 *-----------------------------------------------------------------------------*/
-extern char *code2obs(uint8_t code)
+extern const char *code2obs(uint8_t code)
 {
     if (code<=CODE_NONE||MAXCODE<code) return "";
     return obscodes[code];
@@ -610,7 +610,7 @@ extern char *code2obs(uint8_t code)
 /* GPS obs code to frequency -------------------------------------------------*/
 static int code2freq_GPS(uint8_t code, double *freq)
 {
-    char *obs=code2obs(code);
+    const char *obs=code2obs(code);
 
     switch (obs[0]) {
         case '1': *freq=FREQL1; return 0; /* L1 */
@@ -622,7 +622,7 @@ static int code2freq_GPS(uint8_t code, double *freq)
 /* GLONASS obs code to frequency ---------------------------------------------*/
 static int code2freq_GLO(uint8_t code, int fcn, double *freq)
 {
-    char *obs=code2obs(code);
+    const char *obs=code2obs(code);
 
     switch (obs[0]) {
         case '1':  /* G1 */
@@ -642,7 +642,7 @@ static int code2freq_GLO(uint8_t code, int fcn, double *freq)
 /* Galileo obs code to frequency ---------------------------------------------*/
 static int code2freq_GAL(uint8_t code, double *freq)
 {
-    char *obs=code2obs(code);
+    const char *obs=code2obs(code);
 
     switch (obs[0]) {
         case '1': *freq=FREQL1; return 0; /* E1 */
@@ -656,7 +656,7 @@ static int code2freq_GAL(uint8_t code, double *freq)
 /* QZSS obs code to frequency ------------------------------------------------*/
 static int code2freq_QZS(uint8_t code, double *freq)
 {
-    char *obs=code2obs(code);
+    const char *obs=code2obs(code);
 
     switch (obs[0]) {
         case '1': *freq=FREQL1; return 0; /* L1 */
@@ -669,7 +669,7 @@ static int code2freq_QZS(uint8_t code, double *freq)
 /* SBAS obs code to frequency ------------------------------------------------*/
 static int code2freq_SBS(uint8_t code, double *freq)
 {
-    char *obs=code2obs(code);
+    const char *obs=code2obs(code);
 
     switch (obs[0]) {
         case '1': *freq=FREQL1; return 0; /* L1 */
@@ -680,7 +680,7 @@ static int code2freq_SBS(uint8_t code, double *freq)
 /* BDS obs code to frequency -------------------------------------------------*/
 static int code2freq_BDS(uint8_t code, double *freq)
 {
-    char *obs=code2obs(code);
+    const char *obs=code2obs(code);
 
     switch (obs[0]) {
         case '2': *freq=FREQ1_CMP; return 0; /* B1I */
@@ -695,7 +695,7 @@ static int code2freq_BDS(uint8_t code, double *freq)
 /* NavIC obs code to frequency -----------------------------------------------*/
 static int code2freq_IRN(uint8_t code, double *freq)
 {
-    char *obs=code2obs(code);
+    const char *obs=code2obs(code);
 
     switch (obs[0]) {
         case '5': *freq=FREQL5; return 0; /* L5 */
@@ -813,8 +813,8 @@ extern void setcodepri(int sys, int idx, const char *pri)
 *-----------------------------------------------------------------------------*/
 extern int getcodepri(int sys, uint8_t code, const char *opt)
 {
-    const char *p,*optstr;
-    char *obs,str[8]="";
+    const char *p,*optstr, *obs;
+    char str[8]="";
     int i,j;
 
     switch (sys) {
@@ -1597,14 +1597,14 @@ extern double str2num(const char *s, int i, int n)
 *          gtime_t *t       O   gtime_t struct
 * return : status (0:ok,0>:error)
 *-----------------------------------------------------------------------------*/
-extern int str2time(const char *s, int i, int n, gtime_t *t)
+extern int str2time(const char *s, size_t i, size_t n, gtime_t *t)
 {
-    double ep[6];
-    char str[256],*p=str;
+    char str[256];
 
-    if (i<0||(int)strlen(s)<i||(int)sizeof(str)-1<i) return -1;
-    for (s+=i;*s&&--n>=0;) *p++=*s++;
-    *p='\0';
+    if (i >= strlen(s) || n >= sizeof(str)) return -1;
+    for (size_t j = 0; j < n; j++) str[j] = s[i + j];
+    str[n] = '\0';
+    double ep[6];
     if (sscanf(str,"%lf %lf %lf %lf %lf %lf",ep,ep+1,ep+2,ep+3,ep+4,ep+5)<6)
         return -1;
     if (ep[0]<100.0) ep[0]+=ep[0]<80.0?2000.0:1900.0;
@@ -2041,7 +2041,8 @@ extern int adjgpsweek(int week)
 extern uint32_t tickget(void)
 {
 #ifdef WIN32
-    return (uint32_t)timeGetTime();
+    // To avoid needing all windows.h and lib WinMM for timeGetTime().
+    return (uint32_t)GetTickCount64();
 #else
     struct timespec tp={0};
     struct timeval  tv={0};
@@ -2700,33 +2701,45 @@ extern pcv_t *searchpcv(int sat, const char *type, gtime_t time,
 *-----------------------------------------------------------------------------*/
 extern void readpos(const char *file, const char *rcv, double *pos)
 {
-    static double poss[2048][3];
-    static char stas[2048][16];
-    FILE *fp;
-    int i,j,len,np=0;
-    char buff[256],str[256];
+  trace(3, "readpos: file=%s\n", file);
 
-    trace(3,"readpos: file=%s\n",file);
+  FILE *fp = fopen(file, "r");
+  if (fp == NULL) {
+    fprintf(stderr, "reference position file open error : %s\n", file);
+    return;
+  }
 
-    if (!(fp=fopen(file,"r"))) {
-        fprintf(stderr,"reference position file open error : %s\n",file);
-        return;
-    }
-    while (np<2048&&fgets(buff,sizeof(buff),fp)) {
-        if (buff[0]=='%'||buff[0]=='#') continue;
-        if (sscanf(buff,"%lf %lf %lf %255s",&poss[np][0],&poss[np][1],&poss[np][2],
-                   str)<4) continue;
-        sprintf(stas[np++],"%.15s",str);
-    }
+  size_t maxp = 2048;
+  double (*poss)[3] = malloc(maxp * sizeof(*poss));
+  char (*stas)[16] = malloc(maxp * sizeof(*stas));
+  if (poss == NULL || stas == NULL) {
+    trace(1, "readpos malloc error\n");
     fclose(fp);
-    len=(int)strlen(rcv);
-    for (i=0;i<np;i++) {
-        if (strncmp(stas[i],rcv,len)) continue;
-        for (j=0;j<3;j++) pos[j]=poss[i][j];
-        pos[0]*=D2R; pos[1]*=D2R;
-        return;
-    }
-    pos[0]=pos[1]=pos[2]=0.0;
+    goto done;
+  }
+
+  unsigned np = 0;
+  char buff[256];
+  while (np < maxp && fgets(buff, sizeof(buff), fp)) {
+    if (buff[0] == '%' || buff[0] == '#') continue;
+    char str[256];
+    if (sscanf(buff, "%lf %lf %lf %255s", &poss[np][0], &poss[np][1], &poss[np][2], str) < 4)
+      continue;
+    snprintf(stas[np++], sizeof(stas[0]), "%.15s", str);
+  }
+  fclose(fp);
+  size_t len = strlen(rcv);
+  for (unsigned i = 0; i < np; i++) {
+    if (strncmp(stas[i], rcv, len)) continue;
+    for (unsigned j = 0; j < 3; j++) pos[j] = poss[i][j];
+    pos[0] *= D2R;
+    pos[1] *= D2R;
+    goto done;
+  }
+  pos[0] = pos[1] = pos[2] = 0.0;
+done:
+  free(poss);
+  free(stas);
 }
 /* read blq record -----------------------------------------------------------*/
 static int readblqrecord(FILE *fp, double odisp[2][11][3])
@@ -2789,97 +2802,121 @@ extern int readblq(const char *file, const char *sta, double odisp[2][11][3])
 * read earth rotation parameters
 * args   : char   *file       I   IGS ERP file (IGS ERP ver.2)
 *          erp_t  *erp        O   earth rotation parameters
-* return : status (1:ok,0:file open error)
+* return : number of files read.
 *-----------------------------------------------------------------------------*/
 extern int readerp(const char *file, erp_t *erp) {
   trace(3, "readerp: file=%s\n", file);
 
-  FILE *fp = fopen(file, "r");
-  if (!fp) {
-    trace(2, "erp file open error: file=%s\n", file);
-    return 0;
+  char *efiles[MAXEXFILE];
+
+  for (int i = 0; i < MAXEXFILE; i++) {
+    efiles[i] = (char *)malloc(1024);
+    if (!efiles[i]) {
+      for (i--; i >= 0; i--) free(efiles[i]);
+      return 0;
+    }
   }
-  char buff[256];
-  int state = 0;
-  int utcp = 0, taip = 0;
-  while (fgets(buff, sizeof(buff), fp)) {
-    // Detect the IGS format, and support concatenated files.
-    if (strstr(buff, "version 2") || strstr(buff, "VERSION 2")) {
-      state = 1;
-      continue;
+  // Expand wild card in file path.
+  int n = expath(file, efiles, MAXEXFILE), nr = 0;
+
+  for (int i = 0; i < n; i++) {
+    char *ext = strrchr(efiles[i], '.');
+    if (!ext) continue;
+
+    if (!strstr(ext,".erp") && !strstr(ext,".ERP")) continue;
+
+    FILE *fp = fopen(efiles[i], "r");
+    if (!fp) {
+      trace(2, "erp file open error: file=%s\n", efiles[i]);
+      for (int j = 0; j < MAXEXFILE; j++) free(efiles[j]);
+      return 0;
     }
-    if (state == 0) {
-      // Ignore content without firstly seeing the IGS format version.
-      continue;
-    }
-    if (state == 1) {
-      // IGS format content header search. Data is not read without firstly
-      // reading the content header line. A version line is detected above,
-      // and other lines are ignored. Allow some variation in case.
-      if (strstr(buff, "MJD") || strstr(buff, "mjd") || strstr(buff, "Xpole") ||
-          strstr(buff, "xpole") || strstr(buff, "Ypole") || strstr(buff, "ypole") ||
-          strstr(buff, "UT1") || strstr(buff, "ut1") || strstr(buff, "UTC") ||
-          strstr(buff, "utc") || strstr(buff, "TAI") || strstr(buff, "tai") ||
-          strstr(buff, "LOD") || strstr(buff, "lod")) {
-        // Note UTC vs TAI.
-        utcp = !!(strstr(buff, "UTC") || strstr(buff, "utc"));
-        taip = !!(strstr(buff, "TAI") || strstr(buff, "tai"));
-        state = 2;
-      }
-      continue;
-    }
-    if (state == 2) {
-      // IGS format data search. Detect data lines as containing only
-      // numeric data. A version line is detected above, and other lines are
-      // ignored.
-      int data = 0;
-      for (size_t i = 0; i < strlen(buff); i++) {
-        char ch = buff[i];
-        if (ch == '\0' || ch == '\r' || ch == '\n') break;
-        if (ch == '.' || ch == '-' || ch == '+' || ch == ' ' || ch == '\t') continue;
-        if (ch < '0' || ch > '9') {
-          data = 0;
-          break;
-        }
-        data = 1;
-      }
-      if (!data) continue;
-      double v[14] = {0};
-      if (sscanf(buff, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf", v, v + 1, v + 2,
-                 v + 3, v + 4, v + 5, v + 6, v + 7, v + 8, v + 9, v + 10, v + 11, v + 12,
-                 v + 13) < 5) {
+    char buff[256];
+    int state = 0;
+    int utcp = 0, taip = 0, nerp = 0;
+    while (fgets(buff, sizeof(buff), fp)) {
+      // Detect the IGS format, and support concatenated files.
+      if (strstr(buff, "version 2") || strstr(buff, "VERSION 2")) {
+        state = 1;
         continue;
       }
-      if (erp->n >= erp->nmax) {
-        erp->nmax = erp->nmax <= 0 ? 128 : erp->nmax * 2;
-        erpd_t *erp_data = (erpd_t *)realloc(erp->data, sizeof(erpd_t) * erp->nmax);
-        if (erp_data == NULL) {
-          free(erp->data);
-          erp->data = NULL;
-          erp->n = erp->nmax = 0;
-          fclose(fp);
-          return 0;
+      if (state == 0) {
+        // Ignore content without firstly seeing the IGS format version.
+        continue;
+      }
+      if (state == 1) {
+        // IGS format content header search. Data is not read without firstly
+        // reading the content header line. A version line is detected above,
+        // and other lines are ignored. Allow some variation in case.
+        if (strstr(buff, "MJD") || strstr(buff, "mjd") || strstr(buff, "Xpole") ||
+            strstr(buff, "xpole") || strstr(buff, "Ypole") || strstr(buff, "ypole") ||
+            strstr(buff, "UT1") || strstr(buff, "ut1") || strstr(buff, "UTC") ||
+            strstr(buff, "utc") || strstr(buff, "TAI") || strstr(buff, "tai") ||
+            strstr(buff, "LOD") || strstr(buff, "lod")) {
+          // Note UTC vs TAI.
+          utcp = !!(strstr(buff, "UTC") || strstr(buff, "utc"));
+          taip = !!(strstr(buff, "TAI") || strstr(buff, "tai"));
+          state = 2;
         }
-        erp->data = erp_data;
+        continue;
       }
-      erp->data[erp->n].mjd = v[0];
-      erp->data[erp->n].xp = v[1] * 1E-6 * AS2R;
-      erp->data[erp->n].yp = v[2] * 1E-6 * AS2R;
-      erp->data[erp->n].ut1_utc = v[3] * 1E-7;
-      (void)utcp;
-      if (taip) {
-        // Convert UT1-TAI to UT1-UTC.
-        const double ep[] = {2000, 1, 1, 12, 0, 0};
-        gtime_t tutc = timeadd(epoch2time(ep), (v[0] - 51544.5) * 86400.0);
-        erp->data[erp->n].ut1_utc += timediff(utc2gpst(tutc), tutc) + 19;
+      if (state == 2) {
+        // IGS format data search. Detect data lines as containing only
+        // numeric data. A version line is detected above, and other lines are
+        // ignored.
+        int data = 0;
+        for (size_t i = 0; i < strlen(buff); i++) {
+          char ch = buff[i];
+          if (ch == '\0' || ch == '\r' || ch == '\n') break;
+          if (ch == '.' || ch == '-' || ch == '+' || ch == ' ' || ch == '\t') continue;
+          if (ch < '0' || ch > '9') {
+            data = 0;
+            break;
+          }
+          data = 1;
+        }
+        if (!data) continue;
+        double v[14] = {0};
+        if (sscanf(buff, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf", v, v + 1, v + 2,
+                   v + 3, v + 4, v + 5, v + 6, v + 7, v + 8, v + 9, v + 10, v + 11, v + 12,
+                   v + 13) < 5) {
+          continue;
+        }
+        if (erp->n >= erp->nmax) {
+          erp->nmax = erp->nmax <= 0 ? 128 : erp->nmax * 2;
+          erpd_t *erp_data = (erpd_t *)realloc(erp->data, sizeof(erpd_t) * erp->nmax);
+          if (erp_data == NULL) {
+            free(erp->data);
+            erp->data = NULL;
+            erp->n = erp->nmax = 0;
+            fclose(fp);
+            for (int j = 0; j < MAXEXFILE; j++) free(efiles[j]);
+            return 0;
+          }
+          erp->data = erp_data;
+        }
+        erp->data[erp->n].mjd = v[0];
+        erp->data[erp->n].xp = v[1] * 1E-6 * AS2R;
+        erp->data[erp->n].yp = v[2] * 1E-6 * AS2R;
+        erp->data[erp->n].ut1_utc = v[3] * 1E-7;
+        (void)utcp;
+        if (taip) {
+          // Convert UT1-TAI to UT1-UTC.
+          const double ep[] = {2000, 1, 1, 12, 0, 0};
+          gtime_t tutc = timeadd(epoch2time(ep), (v[0] - 51544.5) * 86400.0);
+          erp->data[erp->n].ut1_utc += timediff(utc2gpst(tutc), tutc) + 19;
+        }
+        erp->data[erp->n].lod = v[4] * 1E-7;
+        erp->data[erp->n].xpr = v[12] * 1E-6 * AS2R;
+        erp->data[erp->n++].ypr = v[13] * 1E-6 * AS2R;
+        nerp++;
       }
-      erp->data[erp->n].lod = v[4] * 1E-7;
-      erp->data[erp->n].xpr = v[12] * 1E-6 * AS2R;
-      erp->data[erp->n++].ypr = v[13] * 1E-6 * AS2R;
     }
+    if (nerp > 0) nr++;
+    fclose(fp);
   }
-  fclose(fp);
-  return 1;
+  for (int j = 0; j < MAXEXFILE; j++) free(efiles[j]);
+  return nr;
 }
 /* get earth rotation parameter values -----------------------------------------
 * get earth rotation parameter values
@@ -3138,7 +3175,7 @@ extern int readnav(const char *file, nav_t *nav)
     eph_t eph0={0};
     geph_t geph0={0};
     char buff[4096],*p;
-    long toe_time,tof_time,toc_time,ttr_time;
+    long unsigned toe_time,tof_time,toc_time,ttr_time;
     int i,sat,prn;
 
     trace(3,"loadnav: file=%s\n",file);
@@ -3162,7 +3199,7 @@ extern int readnav(const char *file, nav_t *nav)
             nav->geph[prn-1]=geph0;
             nav->geph[prn-1].sat=sat;
             toe_time=tof_time=0;
-            (void)sscanf(p+1,"%d,%d,%d,%d,%d,%d,%ld,%ld,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,"
+            (void)sscanf(p+1,"%d,%d,%d,%d,%d,%d,%lu,%lu,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,"
                         "%lf,%lf,%lf,%lf",
                    &nav->geph[prn-1].iode,&nav->geph[prn-1].frq,&nav->geph[prn-1].svh,
                    &nav->geph[prn-1].flags,&nav->geph[prn-1].sva,&nav->geph[prn-1].age,
@@ -3178,7 +3215,7 @@ extern int readnav(const char *file, nav_t *nav)
             nav->eph[sat-1]=eph0;
             nav->eph[sat-1].sat=sat;
             toe_time=toc_time=ttr_time=0;
-            (void)sscanf(p+1,"%d,%d,%d,%d,%ld,%ld,%ld,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,"
+            (void)sscanf(p+1,"%d,%d,%d,%d,%lu,%lu,%lu,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,"
                         "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%d,%d",
                    &nav->eph[sat-1].iode,&nav->eph[sat-1].iodc,&nav->eph[sat-1].sva ,
                    &nav->eph[sat-1].svh ,
@@ -3212,12 +3249,12 @@ extern int savenav(const char *file, const nav_t *nav)
     for (i=0;i<MAXSAT;i++) {
         if (nav->eph[i].ttr.time==0) continue;
         satno2id(nav->eph[i].sat,id);
-        fprintf(fp,"%s,%d,%d,%d,%d,%d,%d,%d,%.14E,%.14E,%.14E,%.14E,%.14E,%.14E,"
+        fprintf(fp,"%s,%d,%d,%d,%d,%lu,%lu,%lu,%.14E,%.14E,%.14E,%.14E,%.14E,%.14E,"
                    "%.14E,%.14E,%.14E,%.14E,%.14E,%.14E,%.14E,%.14E,%.14E,%.14E,"
                    "%.14E,%.14E,%.14E,%.14E,%.14E,%d,%d\n",
                 id,nav->eph[i].iode,nav->eph[i].iodc,nav->eph[i].sva ,
-                nav->eph[i].svh ,(int)nav->eph[i].toe.time,
-                (int)nav->eph[i].toc.time,(int)nav->eph[i].ttr.time,
+                nav->eph[i].svh ,(long unsigned)nav->eph[i].toe.time,
+                (long unsigned)nav->eph[i].toc.time,(long unsigned)nav->eph[i].ttr.time,
                 nav->eph[i].A   ,nav->eph[i].e  ,nav->eph[i].i0  ,nav->eph[i].OMG0,
                 nav->eph[i].omg ,nav->eph[i].M0 ,nav->eph[i].deln,nav->eph[i].OMGd,
                 nav->eph[i].idot,nav->eph[i].crc,nav->eph[i].crs ,nav->eph[i].cuc ,
@@ -3228,12 +3265,12 @@ extern int savenav(const char *file, const nav_t *nav)
     for (i=0;i<MAXPRNGLO;i++) {
         if (nav->geph[i].tof.time==0) continue;
         satno2id(nav->geph[i].sat,id);
-        fprintf(fp,"%s,%d,%d,%d,%d,%d,%d,%d,%d,%.14E,%.14E,%.14E,%.14E,%.14E,%.14E,"
+        fprintf(fp,"%s,%d,%d,%d,%d,%d,%d,%lu,%lu,%.14E,%.14E,%.14E,%.14E,%.14E,%.14E,"
                    "%.14E,%.14E,%.14E,%.14E,%.14E,%.14E\n",
                 id,nav->geph[i].iode,nav->geph[i].frq,nav->geph[i].svh,
                 nav->geph[i].flags,
-                nav->geph[i].sva,nav->geph[i].age,(int)nav->geph[i].toe.time,
-                (int)nav->geph[i].tof.time,
+                nav->geph[i].sva,nav->geph[i].age,(long unsigned)nav->geph[i].toe.time,
+                (long unsigned)nav->geph[i].tof.time,
                 nav->geph[i].pos[0],nav->geph[i].pos[1],nav->geph[i].pos[2],
                 nav->geph[i].vel[0],nav->geph[i].vel[1],nav->geph[i].vel[2],
                 nav->geph[i].acc[0],nav->geph[i].acc[1],nav->geph[i].acc[2],
@@ -3743,8 +3780,8 @@ extern double ionppp(const double *pos, const double *azel, double re,
 /* select iono-free linear combination (L1/L2 or L1/L5) ----------------------*/
 extern int seliflc(int optnf,int sys)
 {
-    /* use L1/L5 for Galileo if L5 is enabled */
-    return((optnf==2||sys!=SYS_GAL)?1:2);
+    /* use L1/L5 for GPS,GAL,BDS if L5 is enabled */
+    return((optnf==2||sys==SYS_GLO)?1:2);
 }
 /* troposphere model -----------------------------------------------------------
 * compute tropospheric delay by standard atmosphere and saastamoinen model
