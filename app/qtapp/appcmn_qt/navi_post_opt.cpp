@@ -174,6 +174,9 @@ OptDialog::OptDialog(QWidget *parent, int opts)
     navSelect = 0;                   /* navigation mesaage select */
     proxyaddr[0] = '\0';             /* proxy address */
 
+    current_roverPositionType = -1;
+    current_referencePositionType = -1;
+
     static opt_t _naviopt[] = {
         { "misc-svrcycle",    0, (void *)&serverCycle,      "ms"    },
         { "misc-timeout",     0, (void *)&timeoutTime,      "ms"    },
@@ -434,10 +437,15 @@ void OptDialog::showSnrMaskDialog()
 //---------------------------------------------------------------------------
 void OptDialog::roverPositionTypeChanged(int)
 {
-    QLineEdit *edit[] = {ui->lERoverPosition1, ui->lERoverPosition2, ui->lERoverPosition3};
-	double pos[3];
+    // Startup guard.
+    if (current_roverPositionType < 0 ) {
+      current_roverPositionType = ui->cBRoverPositionType->currentIndex();
+      return;
+    }
 
     // update position value in accordance to type
+    QLineEdit *edit[] = {ui->lERoverPosition1, ui->lERoverPosition2, ui->lERoverPosition3};
+    double pos[3];
     int error = getPosition(current_roverPositionType, edit, pos);
     if (error) {
         ui->cBRoverPositionType->setCurrentIndex(current_roverPositionType); // don't allow to change the type
@@ -450,6 +458,12 @@ void OptDialog::roverPositionTypeChanged(int)
 //---------------------------------------------------------------------------
 void OptDialog::referencePositionTypeChanged(int)
 {
+    // Startup guard.
+    if (current_referencePositionType < 0 ) {
+      current_referencePositionType = ui->cBReferencePositionType->currentIndex();
+      return;
+    }
+
     QLineEdit *edit[] = {ui->lEReferencePosition1, ui->lEReferencePosition2, ui->lEReferencePosition3};
 	double pos[3];
 
@@ -656,7 +670,6 @@ void OptDialog::selectSolutionFont()
 //---------------------------------------------------------------------------
 void OptDialog::updateOptions()
 {
-    double rovPos[3], refPos[3];
     QLineEdit *editu[] = {ui->lERoverPosition1, ui->lERoverPosition2, ui->lERoverPosition3 };
     QLineEdit *editr[] = {ui->lEReferencePosition1, ui->lEReferencePosition2, ui->lEReferencePosition3 };
     pcvs_t pcvr;
@@ -760,6 +773,7 @@ void OptDialog::updateOptions()
         processingOptions.baseline[1] = 0.0;
     }
 
+    double rovPos[3], refPos[3];
     getPosition(ui->cBRoverPositionType->currentIndex(), editu, rovPos);
     getPosition(ui->cBReferencePositionType->currentIndex(), editr, refPos);
 
@@ -1277,7 +1291,6 @@ void OptDialog::save(const QString &file)
 //---------------------------------------------------------------------------
 void OptDialog::saveOptions(QSettings &settings)
 {
-    double rovPos[3], refPos[3];
     QLineEdit *editu[] = {ui->lERoverPosition1, ui->lERoverPosition2, ui->lERoverPosition3};
     QLineEdit *editr[] = {ui->lEReferencePosition1, ui->lEReferencePosition2, ui->lEReferencePosition3};
 
@@ -1326,6 +1339,7 @@ void OptDialog::saveOptions(QSettings &settings)
 
     settings.setValue("setting/rovpostype", ui->cBRoverPositionType->currentIndex());
     settings.setValue("setting/refpostype", ui->cBReferencePositionType->currentIndex());
+    double rovPos[3] = {0}, refPos[3] = {0};
     if (ui->cBRoverPositionType->currentIndex() < 3) getPosition(ui->cBRoverPositionType->currentIndex(), editu, rovPos);
     if (ui->cBReferencePositionType->currentIndex() < 3) getPosition(ui->cBReferencePositionType->currentIndex(), editr, refPos);
 
@@ -1476,7 +1490,6 @@ void OptDialog::saveOptions(QSettings &settings)
 //---------------------------------------------------------------------------
 void OptDialog::loadOptions(QSettings &settings)
 {
-    double rovPos[3], refPos[3];
     QLineEdit *editu[] = {ui->lERoverPosition1, ui->lERoverPosition2, ui->lERoverPosition3};
     QLineEdit *editr[] = {ui->lEReferencePosition1, ui->lEReferencePosition2, ui->lEReferencePosition3};
 
@@ -1484,7 +1497,7 @@ void OptDialog::loadOptions(QSettings &settings)
     ui->cBPositionMode->setCurrentIndex(settings.value("prcopt/mode", 0).toInt());
     ui->cBSolution->setCurrentIndex(settings.value("prcopt/soltype", 0).toInt());
     ui->cBFrequencies->setCurrentIndex(settings.value("prcopt/nf", 2).toInt() > NFREQ - 1 ? NFREQ - 1 : settings.value("prcopt/nf", 2).toInt() - 1);
-    int navsys = settings.value("prcopt/navsys", SYS_GPS).toInt();
+    int navsys = settings.value("prcopt/navsys", SYS_GPS | SYS_GLO | SYS_GAL | SYS_CMP).toInt();
     ui->cBNavSys1->setChecked(navsys & SYS_GPS);
     ui->cBNavSys2->setChecked(navsys & SYS_GLO);
     ui->cBNavSys3->setChecked(navsys & SYS_GAL);
@@ -1536,9 +1549,9 @@ void OptDialog::loadOptions(QSettings &settings)
     ui->sBMeasurementError3->setValue(settings.value("prcopt/err2", 0.003).toDouble());
     ui->sBMeasurementError4->setValue(settings.value("prcopt/err3", 0.0).toDouble());
     ui->sBMeasurementError5->setValue(settings.value("prcopt/err4", 1.0).toDouble());
-    ui->sBMeasurementErrorSNR_Max->setValue(settings.value("prcopt/err5", 1.0).toDouble());
-    ui->sBMeasurementErrorSNR->setValue(settings.value("prcopt/err6", 1.0).toDouble());
-    ui->sBMeasurementErrorReceiver->setValue(settings.value("prcopt/err7", 1.0).toDouble());
+    ui->sBMeasurementErrorSNR_Max->setValue(settings.value("prcopt/err5", 52.0).toDouble());
+    ui->sBMeasurementErrorSNR->setValue(settings.value("prcopt/err6", 0.000).toDouble());
+    ui->sBMeasurementErrorReceiver->setValue(settings.value("prcopt/err7", 0.000).toDouble());
     // std
     ui->sBProcessNoise1->setValue(settings.value("prcopt/prn0", 1E-4).toDouble());
     ui->sBProcessNoise2->setValue(settings.value("prcopt/prn1", 1E-3).toDouble());
@@ -1546,15 +1559,15 @@ void OptDialog::loadOptions(QSettings &settings)
     ui->sBProcessNoise4->setValue(settings.value("prcopt/prn3", 10.0).toDouble());
     ui->sBProcessNoise5->setValue(settings.value("prcopt/prn4", 10.0).toDouble());
     ui->sBSatelliteClockStability->setValue(settings.value("prcopt/sclkstab", 5E-12).toDouble());
-    ui->sBValidThresAR->setValue(settings.value("prcopt/thresar0", 100.0).toDouble());
-    ui->sBMaxPositionVarAR->setValue(settings.value("prcopt/thresar1", 100.0).toDouble());
-    ui->sBGlonassHwBias->setValue(settings.value("prcopt/thresar2", 100.0).toDouble());
-    ui->sBValidThresARMin->setValue(settings.value("prcopt/thresar5", 100.0).toDouble());
-    ui->sBValidThresARMax->setValue(settings.value("prcopt/thresar6", 100.0).toDouble());
+    ui->sBValidThresAR->setValue(settings.value("prcopt/thresar0", 3.0).toDouble());
+    ui->sBMaxPositionVarAR->setValue(settings.value("prcopt/thresar1", 0.25).toDouble());
+    ui->sBGlonassHwBias->setValue(settings.value("prcopt/thresar2", 0.0).toDouble());
+    ui->sBValidThresARMin->setValue(settings.value("prcopt/thresar5", 3.0).toDouble());
+    ui->sBValidThresARMax->setValue(settings.value("prcopt/thresar6", 3.0).toDouble());
     ui->sBElevationMaskAR->setValue(settings.value("prcopt/elmaskar", 0.0).toDouble());
     ui->sBElevationMaskHold->setValue(settings.value("prcopt/elmaskhold", 0.0).toDouble());
     ui->sBSlipThreshold->setValue(settings.value("prcopt/thresslip", 0.05).toDouble());
-    ui->sBDopplerThreshold->setValue(settings.value("prcopt/thresdop", 0.05).toDouble());
+    ui->sBDopplerThreshold->setValue(settings.value("prcopt/thresdop", 0.00).toDouble());
     ui->sBVarHoldAmb->setValue(settings.value("prcopt/varholdamb", 0.1).toDouble());
     ui->sBGainHoldAmb->setValue(settings.value("prcopt/gainholdamb", 0.01).toDouble());
     ui->sBMaxAgeDifferences->setValue(settings.value("prcopt/maxtdiff", 30.0).toDouble());
@@ -1572,6 +1585,7 @@ void OptDialog::loadOptions(QSettings &settings)
     ui->cBRoverAntenna->setCurrentIndex(ui->cBRoverAntenna->findText(settings.value("prcopt/anttype1", "").toString()));
     ui->cBReferenceAntenna->setCurrentIndex(ui->cBReferenceAntenna->findText(settings.value("prcopt/anttype2", "").toString()));
 
+    double rovPos[3], refPos[3];
     for (int i = 0; i < 3; i++) {
         rovPos[i] = settings.value(QStringLiteral("setting/rovpos_%1").arg(i), 0.0).toDouble();
         refPos[i] = settings.value(QStringLiteral("setting/refpos_%1").arg(i), 0.0).toDouble();
