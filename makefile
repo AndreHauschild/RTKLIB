@@ -63,7 +63,7 @@ endif
 
 # Targets
 
-all: init apps_ utest_
+all: init apps_
 
 utils: iers_ gencrc_ logfile_ rnx2rtcm_ simobs_ # geniono_ testeph_
 
@@ -80,9 +80,6 @@ test_:
 	
 iers_:
 	cd $(IERS); $(PMAKE)
-
-utest_:
-	cd $(UTEST); $(PMAKE) all
 
 apps_:
 	cd $(RTKLIB_bld); cmake ..; $(PMAKE)
