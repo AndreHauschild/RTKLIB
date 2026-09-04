@@ -100,7 +100,7 @@ __fastcall TPlot::TPlot(TComponent* Owner) : TForm(Owner)
     obs0.data=NULL; obs0.n =obs0.nmax =0;
     ObsIndex=0;
     Obs=obs0;
-    memset(&Nav, 0, sizeof(Nav));
+    Nav = new nav_t{};
     Sta=sta0;
     Gis=gis0;
     SimObs=0;
@@ -1445,7 +1445,7 @@ void __fastcall TPlot::DispDblClick(TObject *Sender)
     TPoint p((int)X0,(int)Y0);
     double x,y;
     
-    trace(3,"DispDblClick X=%d Y=%d\n",p.x,p.y);
+    trace(3,"DispDblClick X=%ld Y=%ld\n",p.x,p.y);
     
     if (BtnFixHoriz->Down) return;
     
@@ -1519,8 +1519,9 @@ void __fastcall TPlot::MouseDownSol(int X, int Y)
         
         GraphG[0]->GetLim(xl,yl);
         GraphG[0]->ToPoint(x,yl[1],pnt);
-        
-        if ((X-pnt.x)*(X-pnt.x)+(Y-pnt.y)*(Y-pnt.y)<25) {
+
+        double dx = X - pnt.x, dy = Y - pnt.y;
+        if (dx * dx + dy * dy < 5 * 5) {
             Screen->Cursor=crSizeWE;
             Drag=20;
             Refresh();
@@ -1568,7 +1569,8 @@ void __fastcall TPlot::MouseDownObs(int X, int Y)
         GraphR->GetLim(xl,yl);
         GraphR->ToPoint(x,yl[1],pnt);
         
-        if ((X-pnt.x)*(X-pnt.x)+(Y-pnt.y)*(Y-pnt.y)<25) {
+        double dx = X - pnt.x, dy = Y - pnt.y;
+        if (dx * dx + dy * dy < 5 * 5) {
             Screen->Cursor=crSizeWE;
             Drag=20;
             Refresh();

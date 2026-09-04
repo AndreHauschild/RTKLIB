@@ -44,7 +44,7 @@
 *                           delete option -noscan
 *                           suppress warnings
 *-----------------------------------------------------------------------------*/
-#define _POSIX_C_SOURCE 199506
+#define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -403,7 +403,11 @@ static int get_filetime(const char *file, gtime_t *time)
     struct stat st;
     if (!stat(path, &st)) {
         struct tm tm;
+#ifdef _MSC_VER
+        if (gmtime_s(&tm, &st.st_mtime) != 0) {
+#else
         if (gmtime_r(&st.st_mtime, &tm)) {
+#endif
           double ep[6];
           ep[0] = tm.tm_year + 1900;
           ep[1] = tm.tm_mon + 1;
@@ -518,7 +522,7 @@ static int cmdopts(int argc, char **argv, rnxopt_t *opt, char **ifile,
             }
         }
         else if (!strcmp(argv[i],"-v" )&&i+1<argc) {
-            opt->rnxver=(int)(atof(argv[++i])*100.0);
+            opt->rnxver=(int)round(atof(argv[++i])*100.0);
         }
         else if (!strcmp(argv[i],"-od")) {
             opt->obstype|=OBSTYPE_DOP;

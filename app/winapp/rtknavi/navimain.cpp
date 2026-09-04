@@ -127,8 +127,8 @@ __fastcall TMainForm::TMainForm(TComponent* Owner)
         CmdEna[i][0]=CmdEna[i][1]=CmdEna[i][2]=0;
     }
     TimeSys=SolType=PlotType1=PlotType2=FreqType1=FreqType2=0;
-    TrkType1=TrkType2=0;
-    TrkScale1=TrkScale2=5;
+    TrkType1=TrkType2=TrkType3=TrkType4=0;
+    TrkScale1=TrkScale2=TrkScale3=TrkScale4=8;
     BLMode1=BLMode2=BLMode3=BLMode4=0;
     PSol=PSolS=PSolE=Nsat[0]=Nsat[1]=0;
     NMapPnt=0;
@@ -138,9 +138,12 @@ __fastcall TMainForm::TMainForm(TComponent* Owner)
     SolCurrentStat=0;
     SolRov=SolRef=Qr=VelRov=Age=Ratio=NULL;
     for (int i=0;i<2;i++) for (int j=0;j<MAXSAT;j++) {
-        Sat[i][j]=Vsat[i][j]=0;
+        Sat[i][j]=0;
         Az[i][j]=El[i][j]=0.0;
-        for (int k=0;k<NFREQ;k++) Snr[i][j][k]=0;
+        for (int k=0;k<NFREQ;k++) {
+          Snr[i][j][k]=0.0;
+          Vsat[i][j][k]=0;
+        }
     }
     PrcOpt=prcopt_default;
     SolOpt=solopt_default;
@@ -1011,6 +1014,34 @@ void __fastcall TMainForm::BtnShrink2Click(TObject *Sender)
     TrkScale2++;
     UpdatePlot();
 }
+// callback on button expand-2 ----------------------------------------------
+void __fastcall TMainForm::BtnExpand3Click(TObject *Sender)
+{
+    if (TrkScale3<=0) return;
+    TrkScale3--;
+    UpdatePlot();
+}
+// callback on button shrink-3 ----------------------------------------------
+void __fastcall TMainForm::BtnShrink3Click(TObject *Sender)
+{
+    if (TrkScale3>=MAXTRKSCALE) return;
+    TrkScale3++;
+    UpdatePlot();
+}
+// callback on button expand-4 ----------------------------------------------
+void __fastcall TMainForm::BtnExpand4Click(TObject *Sender)
+{
+    if (TrkScale4<=0) return;
+    TrkScale4--;
+    UpdatePlot();
+}
+// callback on button shrink-4 ----------------------------------------------
+void __fastcall TMainForm::BtnShrink4Click(TObject *Sender)
+{
+    if (TrkScale4>=MAXTRKSCALE) return;
+    TrkScale4++;
+    UpdatePlot();
+}
 // callback on button-rtk-monitor -------------------------------------------
 void __fastcall TMainForm::BtnMonitorClick(TObject *Sender)
 {
@@ -1292,6 +1323,7 @@ void __fastcall TMainForm::SvrStart(void)
     strsetopt(stropt);
     strcpy(rtksvr.cmd_reset,ResetCmd.c_str());
     rtksvr.bl_reset=MaxBL;
+    //rtksvrinit(&rtksvr);  // uncomment this to make RTKNAVI repeatable from run to run (useful for debug)
     
     // start rtk server
     if (!rtksvrstart(&rtksvr,SvrCycle,SvrBuffSize,strs,(const char **)paths,Format,
@@ -1637,8 +1669,9 @@ void __fastcall TMainForm::DrawPlot(TImage *plot, int type, int freq)
     TCanvas *c=plot->Canvas;
     TLabel *label[]={Plabel1,Plabel2,Plabel3,Pos1,Pos2,Pos3};
     int w=plot->Parent->Width-2,h=plot->Parent->Height-2;
-    int i,j,x,sat[2][MAXSAT],ns[2],snr[2][MAXSAT][NFREQ],vsat[2][MAXSAT];
-    int *snr0[MAXSAT],*snr1[MAXSAT],tm=PanelFont->Size*3/2;
+    int i,j,x,sat[2][MAXSAT],ns[2],vsat[2][MAXSAT][NFREQ];
+    double snr[2][MAXSAT][NFREQ];
+    int tm=PanelFont->Size*3/2;
     char name[16];
     double az[2][MAXSAT],el[2][MAXSAT],rr[3],rs[6],e[3],pos[3],azel[2];
     
@@ -1649,12 +1682,8 @@ void __fastcall TMainForm::DrawPlot(TImage *plot, int type, int freq)
     }
     fstr[i+1]=" SYS";
     
-    for (i=0;i<MAXSAT;i++) {
-        snr0[i]=snr[0][i];
-        snr1[i]=snr[1][i];
-    }
-    ns[0]=rtksvrostat(&rtksvr,0,&time,sat[0],az[0],el[0],snr0,vsat[0]);
-    ns[1]=rtksvrostat(&rtksvr,1,&time,sat[1],az[1],el[1],snr1,vsat[1]);
+    ns[0]=rtksvrostat(&rtksvr,0,&time,sat[0],az[0],el[0],snr[0],vsat[0]);
+    ns[1]=rtksvrostat(&rtksvr,1,&time,sat[1],az[1],el[1],snr[1],vsat[1]);
     
     rtksvrlock(&rtksvr);
     matcpy(rr,rtksvr.rtk.sol.rr,3,1);
@@ -1669,15 +1698,15 @@ void __fastcall TMainForm::DrawPlot(TImage *plot, int type, int freq)
                 Az  [i][j]=az  [i][j];
                 El  [i][j]=el  [i][j];
                 for (int k=0;k<NFREQ;k++) {
+                    Vsat[i][j][k]=vsat[i][j][k];
                     Snr[i][j][k]=snr[i][j][k];
                 }
-                Vsat[i][j]=vsat[i][j];
             }
         }
         else {
             for (j=0;j<Nsat[i];j++) {
-                Vsat[i][j]=0;
                 for (int k=0;k<NFREQ;k++) {
+                    Vsat[i][j][k]=0;
                     Snr[i][j][k]=0;
                 }
             }
@@ -1774,16 +1803,16 @@ void __fastcall TMainForm::UpdatePlot(void)
     }
 }
 // snr color ----------------------------------------------------------------
-TColor __fastcall TMainForm::SnrColor(int snr)
+TColor __fastcall TMainForm::SnrColor(double snr)
 {
     TColor color[]={clGreen,CLORANGE,clFuchsia,clBlue,clRed,clGray};
     uint32_t c1,c2,r1,r2,g1,g2,b1,b2;
     double a;
     int i;
     
-    if (snr<25) return color[5];
-    if (snr<27) return color[4];
-    if (snr>47) return color[0];
+    if (snr<25.0) return color[5];
+    if (snr<27.0) return color[4];
+    if (snr>47.0) return color[0];
     a=(snr-27.5)/5.0;
     i=(int)a; a-=i;
     c1=(uint32_t)color[3-i];
@@ -1809,7 +1838,8 @@ void __fastcall TMainForm::DrawSnr(TCanvas *c, int w, int h, int x0, int y0,
         clGreen,(TColor)0xAAFF,clFuchsia,clBlue,clRed,clTeal,clGray
     };
     UTF8String s; 
-    int i,j,k,l,n,x1,x2,y1,y2,y3,k1,tm,bm,hh,ww,www,snr[NFREQ+1],mask[7]={0};
+    int i,j,k,l,n,x1,x2,y1,y2,y3,k1,tm,bm,hh,ww,www,mask[7]={0};
+    double snr[NFREQ+1];
     char id[8],sys[]="GREJCIS",*q;
     
     trace(4,"DrawSnr: w=%d h=%d x0=%d y0=%d index=%d freq=%d\n",w,h,x0,y0,index,freq);
@@ -1822,7 +1852,7 @@ void __fastcall TMainForm::DrawSnr(TCanvas *c, int w, int h, int x0, int y0,
     for (snr[0]=MINSNR+10;snr[0]<MAXSNR;snr[0]+=10) {
         y1=y0+hh-(snr[0]-MINSNR)*hh/(MAXSNR-MINSNR);
         c->MoveTo(x0+2,y1); c->LineTo(x0+w-2,y1);
-        DrawText(c,x0+w-4,y1,s.sprintf("%d",snr[0]),clGray,2,0);
+        DrawText(c,x0+w-4,y1,s.sprintf("%d",(int)round(snr[0])),clGray,2,0);
     }
     y1=y0+hh;
     TRect b(x0+2,y0,x0+w-2,y1);
@@ -1837,8 +1867,9 @@ void __fastcall TMainForm::DrawSnr(TCanvas *c, int w, int h, int x0, int y0,
         x1=x0+i*(w-16)/Nsat[index]+ww/2;
         satno2id(Sat[index][i],id);
         l=(q=strchr(sys,id[0]))?(int)(q-sys):6;
-        
-        for (j=snr[0]=0;j<NFREQ;j++) {
+
+        snr[0]=0.0;
+        for (j=0;j<NFREQ;j++) {
             snr[j+1]=Snr[index][i][j];
             if ((freq&&freq==j+1)||((!freq||freq>NFREQ)&&snr[j+1]>snr[0])) {
                 snr[0]=snr[j+1];
@@ -1848,14 +1879,17 @@ void __fastcall TMainForm::DrawSnr(TCanvas *c, int w, int h, int x0, int y0,
             k=j<NFREQ+1?j:0;
             y3=j<NFREQ+1?0:2;
             y2=y1-y3;
-            if (snr[k]>0) y2-=(snr[k]-MINSNR)*hh/(MAXSNR-MINSNR)-y3;
+            if (snr[k]>0) y2-=(int)round((snr[k]-MINSNR)*hh/(MAXSNR-MINSNR)-y3);
             y2=y2<2?2:(y1<y2?y1:y2);
             
             TRect r1(x1,y1,x1+www,y2);
             if (j==0) {
                 c->Brush->Style=bsSolid;
                 c->Brush->Color=freq<NFREQ+1?SnrColor(snr[k]):color_sys[l];
-                if (!Vsat[index][i]) c->Brush->Color=clSilver;
+                int any = 0;
+                for (int fi = 0; fi < NFREQ; fi++)
+                  if (Vsat[index][i][fi]) { any = 1; break; }
+                if (!any) c->Brush->Color=clSilver;
                 c->Rectangle(r1);
             }
             else {
@@ -1885,7 +1919,8 @@ void __fastcall TMainForm::DrawSat(TCanvas *c, int w, int h, int x0, int y0,
     UTF8String s;
     TPoint p(w/2,h/2);
     double r=MIN(w*0.95,h*0.95)/2,azel[MAXSAT*2],dop[4];
-    int i,j,k,l,d,x[MAXSAT],y[MAXSAT],snr[NFREQ+1],ns=0;
+    int i,j,k,l,d,x[MAXSAT],y[MAXSAT],ns=0;
+    double snr[NFREQ+1];
     char id[8],sys[]="GREJCIS",*q;
     
     trace(4,"DrawSat: w=%d h=%d index=%d freq=%d\n",w,h,index,freq);
@@ -1894,13 +1929,17 @@ void __fastcall TMainForm::DrawSat(TCanvas *c, int w, int h, int x0, int y0,
     
     for (i=0,k=Nsat[index]-1;i<Nsat[index]&&i<MAXSAT;i++,k--) {
         if (El[index][k]<=0.0) continue;
-        for (j=snr[0]=0;j<NFREQ;j++) {
+        snr[0]=0;
+        for (j=0;j<NFREQ;j++) {
             snr[j+1]=Snr[index][k][j];
             if ((freq&&freq==j+1)||((!freq||freq>NFREQ)&&snr[j+1]>snr[0])) {
                 snr[0]=snr[j+1]; // max snr
             }
         }
-        if (Vsat[index][k]&&(freq>NFREQ||snr[freq]>0)) {
+        int anyvsatf = 0;
+        for (int fi = 0; fi < NFREQ; fi++)
+          if (Vsat[index][k][fi]) { anyvsatf = 1; break; }
+        if (anyvsatf && (freq > NFREQ || snr[freq] > 0)) {
             azel[ns*2]=Az[index][k]; azel[1+ns*2]=El[index][k];
             ns++;
         }
@@ -1909,7 +1948,7 @@ void __fastcall TMainForm::DrawSat(TCanvas *c, int w, int h, int x0, int y0,
         x[i]=(int)(p.x+r*(90-El[index][k]*R2D)/90*sin(Az[index][k]))+x0;
         y[i]=(int)(p.y-r*(90-El[index][k]*R2D)/90*cos(Az[index][k]))+y0;
         d=PanelFont->Size*3/2;
-        c->Brush->Color=!Vsat[index][k]?clSilver:
+        c->Brush->Color=!anyvsatf?clSilver:
                         (freq<NFREQ+1?SnrColor(snr[freq]):color_sys[l]);
         c->Brush->Style=bsSolid;
         c->Pen->Color=clGray;
@@ -2037,12 +2076,12 @@ void __fastcall TMainForm::DrawTrk(TImage *plot)
         10000.0
     };
     double *x,*y,xt,yt,sx,sy,ref[3],pos[3],dr[3],enu[3];
-    int i,j,k,n=0,type,scl;
+    int i,j,k,n=0;
     
     trace(3,"DrawTrk\n");
     
-    type=plot->Name=="Plot1"?TrkType1 :TrkType2 ;
-    scl =plot->Name=="Plot1"?TrkScale1:TrkScale2;
+    int type=plot->Name=="Plot1"?TrkType1:plot->Name=="Plot2"?TrkType2:plot->Name=="Plot3"?TrkType3:TrkType4;
+    int scl =plot->Name=="Plot1"?TrkScale1:plot->Name=="Plot2"?TrkScale2:plot->Name=="Plot3"?TrkScale3:TrkScale4;
     
     x=new double[SolBuffSize];
     y=new double[SolBuffSize];
@@ -2294,19 +2333,19 @@ void __fastcall TMainForm::LoadNav(nav_t *nav)
     AnsiString str,s;
     eph_t eph0={0};
     char buff[2049],id[32],*p;
-    long toe_time,toc_time,ttr_time;
+    long unsigned toe_time,toc_time,ttr_time;
     int i;
     
     trace(3,"LoadNav\n");
     
     for (i=0;i<MAXSAT*2;i++) {
-        if ((str=ini->ReadString("navi",s.sprintf("eph_%02d",i),""))=="") continue;
+        if ((str=ini->ReadString("navi",s.sprintf("eph_%03d",i),""))=="") continue;
         nav->eph[i]=eph0;
         strcpy(buff,str.c_str());
         if (!(p=strchr(buff,','))) continue;
         *p='\0';
         if (!(nav->eph[i].sat=satid2no(buff))) continue;
-        sscanf(p+1,"%d,%d,%d,%d,%ld,%ld,%ld,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%d,%d,%lf",
+        sscanf(p+1,"%d,%d,%d,%d,%lu,%lu,%lu,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%d,%d,%lf",
                &nav->eph[i].iode,
                &nav->eph[i].iodc,
                &nav->eph[i].sva ,
@@ -2375,9 +2414,9 @@ void __fastcall TMainForm::SaveNav(nav_t *nav)
         str=str+s.sprintf("%d,",nav->eph[i].iodc);
         str=str+s.sprintf("%d,",nav->eph[i].sva);
         str=str+s.sprintf("%d,",nav->eph[i].svh);
-        str=str+s.sprintf("%d,",(int)nav->eph[i].toe.time);
-        str=str+s.sprintf("%d,",(int)nav->eph[i].toc.time);
-        str=str+s.sprintf("%d,",(int)nav->eph[i].ttr.time);
+        str=str+s.sprintf("%lu,",(long unsigned)nav->eph[i].toe.time);
+        str=str+s.sprintf("%lu,",(long unsigned)nav->eph[i].toc.time);
+        str=str+s.sprintf("%lu,",(long unsigned)nav->eph[i].ttr.time);
         str=str+s.sprintf("%.14E,",nav->eph[i].A);
         str=str+s.sprintf("%.14E,",nav->eph[i].e);
         str=str+s.sprintf("%.14E,",nav->eph[i].i0);
@@ -2402,7 +2441,7 @@ void __fastcall TMainForm::SaveNav(nav_t *nav)
         str=str+s.sprintf("%d,",nav->eph[i].code);
         str=str+s.sprintf("%d,",nav->eph[i].flag);
         str=str+s.sprintf("%.14E,",nav->eph[i].tgd[1]);
-        ini->WriteString("navi",s.sprintf("eph_%02d",i),str);
+        ini->WriteString("navi",s.sprintf("eph_%03d",i),str);
     }
     str="";
     for (i=0;i<8;i++) str=str+s.sprintf("%.14E,",nav->ion_gps[i]);
@@ -2460,6 +2499,7 @@ void __fastcall TMainForm::LoadOpt(void)
     }
     PrcOpt.mode     =ini->ReadInteger("prcopt", "mode",            2);
     PrcOpt.nf       =ini->ReadInteger("prcopt", "nf",          NFREQ);
+    if (PrcOpt.nf > NFREQ) PrcOpt.nf = NFREQ;
     PrcOpt.elmin    =ini->ReadFloat  ("prcopt", "elmin",    15.0*D2R);
     PrcOpt.snrmask.ena[0]=ini->ReadInteger("prcopt","snrmask_ena1",0);
     PrcOpt.snrmask.ena[1]=ini->ReadInteger("prcopt","snrmask_ena2",0);
@@ -2509,7 +2549,7 @@ void __fastcall TMainForm::LoadOpt(void)
     PrcOpt.thresar[4]=ini->ReadFloat ("prcopt", "thresar4",      1E-5);
     PrcOpt.elmaskar =ini->ReadFloat  ("prcopt", "elmaskar",  15.0*D2R);
     PrcOpt.elmaskhold=ini->ReadFloat ("prcopt", "elmaskhold",15.0*D2R);
-    PrcOpt.thresdop=ini->ReadFloat    ("prcopt", "thresdop",      0.00);
+    PrcOpt.thresdop=ini->ReadFloat   ("prcopt", "thresdop",      0.00);
     PrcOpt.thresslip=ini->ReadFloat  ("prcopt", "thresslip",     0.05);
     PrcOpt.maxtdiff =ini->ReadFloat  ("prcopt", "maxtdiff",      30.0);
     PrcOpt.maxinno[0]=ini->ReadFloat  ("prcopt", "maxphase",      5.0);
@@ -2611,14 +2651,18 @@ void __fastcall TMainForm::LoadOpt(void)
     TrkType2        =ini->ReadInteger("setting","trktype2",        0);
     TrkType3        =ini->ReadInteger("setting","trktype3",        0);
     TrkType4        =ini->ReadInteger("setting","trktype4",        0);
-    TrkScale1       =ini->ReadInteger("setting","trkscale1",       5);
-    TrkScale2       =ini->ReadInteger("setting","trkscale2",       5);
-    TrkScale3       =ini->ReadInteger("setting","trkscale3",       5);
-    TrkScale4       =ini->ReadInteger("setting","trkscale4",       5);
+    TrkScale1       =ini->ReadInteger("setting","trkscale1",       8);
+    TrkScale2       =ini->ReadInteger("setting","trkscale2",       8);
+    TrkScale3       =ini->ReadInteger("setting","trkscale3",       8);
+    TrkScale4       =ini->ReadInteger("setting","trkscale4",       8);
     FreqType1       =ini->ReadInteger("setting","freqtype1",       0);
     FreqType2       =ini->ReadInteger("setting","freqtype2",       0);
     FreqType3       =ini->ReadInteger("setting","freqtype3",       0);
     FreqType4       =ini->ReadInteger("setting","freqtype4",       0);
+    if (FreqType1 > NFREQ + 1) FreqType1 = 0;
+    if (FreqType2 > NFREQ + 1) FreqType2 = 0;
+    if (FreqType3 > NFREQ + 1) FreqType3 = 0;
+    if (FreqType4 > NFREQ + 1) FreqType4 = 0;
     BLMode1         =ini->ReadInteger("setting","blmode1",         0);
     BLMode2         =ini->ReadInteger("setting","blmode2",         0);
     BLMode3         =ini->ReadInteger("setting","blmode3",         0);
@@ -2757,6 +2801,9 @@ void __fastcall TMainForm::SaveOpt(void)
     ini->WriteFloat  ("prcopt", "err2",       PrcOpt.err[2]      );
     ini->WriteFloat  ("prcopt", "err3",       PrcOpt.err[3]      );
     ini->WriteFloat  ("prcopt", "err4",       PrcOpt.err[4]      );
+    ini->WriteFloat  ("prcopt", "err5",       PrcOpt.err[5]      );
+    ini->WriteFloat  ("prcopt", "err6",       PrcOpt.err[6]      );
+    ini->WriteFloat  ("prcopt", "err7",       PrcOpt.err[7]      );
     ini->WriteFloat  ("prcopt", "prn0",       PrcOpt.prn[0]      );
     ini->WriteFloat  ("prcopt", "prn1",       PrcOpt.prn[1]      );
     ini->WriteFloat  ("prcopt", "prn2",       PrcOpt.prn[2]      );
