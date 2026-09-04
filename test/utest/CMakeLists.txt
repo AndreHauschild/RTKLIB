@@ -5,6 +5,8 @@ find_package(BLAS   REQUIRED)
 find_package(LAPACK REQUIRED)
 set(BASE_LIBRARIES ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/test/utest)
+
 add_executable(t_matrix t_matrix.c ${RTKLBI_DIR}/rtkcmn.c ${RTKLBI_DIR}/trace.c ${RTKLBI_DIR}/preceph.c)
 target_link_libraries(t_matrix m ${BASE_LIBRARIES})
 
